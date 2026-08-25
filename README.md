@@ -1,5 +1,3 @@
-Sure — I'd also make it a little more professional and minimal.
-
 # Pumpify
 
 Pumpify is a fitness application for tracking workout routines, creating systems, and building consistent habits.
