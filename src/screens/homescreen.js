@@ -120,11 +120,11 @@ const styles = StyleSheet.create({
   sectionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#93A0B8',
+    color: '#ffffff',
   },
 
   activeSectionText: {
-    color: '#353535',
+    color: '#dadada',
   },
 
   pressed: {
