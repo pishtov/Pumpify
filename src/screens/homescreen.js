@@ -1,11 +1,27 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 const TABS = [
-  { label: 'Home', icon: '⌂' },
-  { label: 'Workouts', icon: '▤' },
-  { label: 'Progress', icon: '▲' },
-  { label: 'Profile', icon: '◉' },
+  {
+    label: 'Home',
+    iconOn: require('../../assets/icons/house_on.png'),
+    iconOff: require('../../assets/icons/house_off.png'),
+  },
+  {
+    label: 'Workouts',
+    iconOn: require('../../assets/icons/dumbbell_on.png'),
+    iconOff: require('../../assets/icons/dumbbell_off.png'),
+  },
+  {
+    label: 'Progress',
+    iconOn: require('../../assets/icons/chart_on.png'),
+    iconOff: require('../../assets/icons/chart_off.png'),
+  },
+  {
+    label: 'Profile',
+    iconOn: require('../../assets/icons/profile_on.png'),
+    iconOff: require('../../assets/icons/profile_off.png'),
+  },
 ];
 
 export default function HomeScreen() {
@@ -31,9 +47,10 @@ export default function HomeScreen() {
               onPress={() => setActiveTab(tab.label)}
               style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}
             >
-              <Text style={[styles.navIcon, isActive && styles.navActiveText]}>
-                {tab.icon}
-              </Text>
+              <Image
+                source={isActive ? tab.iconOn : tab.iconOff}
+                style={styles.navIcon}
+              />
               <Text style={[styles.navLabel, isActive && styles.navActiveText]}>
                 {tab.label}
               </Text>
@@ -48,7 +65,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: '#0C0C0C',
   },
 
   placeholder: {
@@ -59,7 +76,7 @@ const styles = StyleSheet.create({
 
   placeholderText: {
     fontSize: 16,
-    color: '#8A8A8A',
+    color: '#8E8E93',
   },
 
   bottomNav: {
@@ -70,28 +87,29 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     borderTopWidth: 1,
     borderTopColor: '#242424',
-    backgroundColor: '#0A0A0A',
+    backgroundColor: '#0C0C0C',
   },
 
   navItem: {
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 4,
   },
 
   navIcon: {
-    fontSize: 18,
-    color: '#8A8A8A',
+    width: 22,
+    height: 22,
+    resizeMode: 'contain',
   },
 
   navLabel: {
     fontSize: 10,
-    color: '#8A8A8A',
+    color: '#8E8E93',
   },
 
   navActiveText: {
-    color: '#CFFF3D',
+    color: '#D2FF00',
     fontWeight: '700',
   },
 
