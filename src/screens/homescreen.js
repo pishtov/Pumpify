@@ -1,51 +1,41 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-export default function HomeScreen() {
-  const [activeSection, setActiveSection] = useState('Calendar');
+const TABS = [
+  { label: 'Home', icon: '⌂' },
+  { label: 'Workouts', icon: '▤' },
+  { label: 'Progress', icon: '▲' },
+  { label: 'Profile', icon: '◉' },
+];
 
-  const sections = [
-    { label: 'Calendar', icon: '▦' },
-    { label: 'Heatmap', icon: '♨' },
-    { label: 'Summary', icon: '▥' },
-  ];
+export default function HomeScreen() {
+  const [activeTab, setActiveTab] = useState('Home');
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Pumpify</Text>
-        <Pressable
-          accessibilityLabel="Open settings"
-          accessibilityRole="button"
-          hitSlop={10}
-          onPress={() => {}}
-          style={({ pressed }) => [styles.settingsButton, pressed && styles.pressed]}
-        >
-        </Pressable>
+    <View style={styles.screen}>
+      <View style={styles.placeholder}>
+        <Text style={styles.placeholderText}>{activeTab}</Text>
       </View>
 
-      <View style={styles.sectionRow}>
-        {sections.map((section) => {
-          const isActive = activeSection === section.label;
+      <View style={styles.bottomNav}>
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.label;
 
           return (
             <Pressable
-              accessibilityLabel={`${section.label} section`}
+              accessibilityLabel={tab.label}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
-              key={section.label}
-              onPress={() => setActiveSection(section.label)}
-              style={({ pressed }) => [
-                styles.sectionButton,
-                isActive && styles.activeSectionButton,
-                pressed && styles.pressed,
-              ]}
+              hitSlop={6}
+              key={tab.label}
+              onPress={() => setActiveTab(tab.label)}
+              style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}
             >
-              <Text style={[styles.sectionIcon, isActive && styles.activeSectionText]}>
-                {section.icon}
+              <Text style={[styles.navIcon, isActive && styles.navActiveText]}>
+                {tab.icon}
               </Text>
-              <Text style={[styles.sectionText, isActive && styles.activeSectionText]}>
-                {section.label}
+              <Text style={[styles.navLabel, isActive && styles.navActiveText]}>
+                {tab.label}
               </Text>
             </Pressable>
           );
@@ -56,75 +46,53 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: '#010001',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    paddingTop: 48,
-    paddingLeft: 20,
-    paddingRight: 20,
+    backgroundColor: '#0A0A0A',
   },
 
-  header: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-
-  title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#FFF600',
-  },
-
-  settingsButton: {
+  placeholder: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 36,
-    height: 36,
   },
 
-  sectionRow: {
-    width: '100%',
-    flexDirection: 'row',
-    gap: 12,
-  },
-
-  sectionButton: {
-    flex: 1,
-    minHeight: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: '#202637',
-    borderRadius: 8,
-    backgroundColor: '#111114',
-  },
-
-  activeSectionButton: {
-    borderColor: '#ffe600',
-    backgroundColor: '#776b00',
-  },
-
-  sectionIcon: {
-    fontSize: 19,
-    color: '#93A0B8',
-  },
-
-  sectionText: {
+  placeholderText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
+    color: '#8A8A8A',
   },
 
-  activeSectionText: {
-    color: '#dadada',
+  bottomNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingTop: 12,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#242424',
+    backgroundColor: '#0A0A0A',
+  },
+
+  navItem: {
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+
+  navIcon: {
+    fontSize: 18,
+    color: '#8A8A8A',
+  },
+
+  navLabel: {
+    fontSize: 10,
+    color: '#8A8A8A',
+  },
+
+  navActiveText: {
+    color: '#CFFF3D',
+    fontWeight: '700',
   },
 
   pressed: {
