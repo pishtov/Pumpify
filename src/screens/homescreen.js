@@ -29,6 +29,11 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.screen}>
+      <View style={styles.header}>
+        <View style={styles.logoBar} />
+        <Text style={styles.logoText}>PUMPIFY</Text>
+      </View>
+
       <View style={styles.placeholder}>
         <Text style={styles.placeholderText}>{activeTab}</Text>
       </View>
@@ -65,7 +70,29 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#0C0C0C',
+    backgroundColor: '#0A0A0A',
+  },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 56,
+    paddingHorizontal: 20,
+  },
+
+  logoBar: {
+    width: 4,
+    height: 20,
+    borderRadius: 2,
+    backgroundColor: '#CFFF3D',
+  },
+
+  logoText: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    color: '#F5F5F5',
   },
 
   placeholder: {
@@ -76,7 +103,7 @@ const styles = StyleSheet.create({
 
   placeholderText: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: '#8A8A8A',
   },
 
   bottomNav: {
@@ -87,7 +114,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     borderTopWidth: 1,
     borderTopColor: '#242424',
-    backgroundColor: '#0C0C0C',
+    backgroundColor: '#0A0A0A',
   },
 
   navItem: {
@@ -105,11 +132,11 @@ const styles = StyleSheet.create({
 
   navLabel: {
     fontSize: 10,
-    color: '#8E8E93',
+    color: '#8A8A8A',
   },
 
   navActiveText: {
-    color: '#D2FF00',
+    color: '#CFFF3D',
     fontWeight: '700',
   },
 
