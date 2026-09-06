@@ -1,8 +1,25 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 function NavTabButton({ tab, isActive, onPress }) {
   const scale = useRef(new Animated.Value(1)).current;
+  const bgOpacity = useRef(new Animated.Value(isActive ? 1 : 0)).current;
+  const liftY = useRef(new Animated.Value(isActive ? -4 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(bgOpacity, {
+      toValue: isActive ? 1 : 0,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+
+    Animated.spring(liftY, {
+      toValue: isActive ? -4 : 0,
+      friction: 7,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
+  }, [isActive]);
 
   function handlePress() {
     Animated.sequence([
@@ -32,10 +49,10 @@ function NavTabButton({ tab, isActive, onPress }) {
       <Animated.View
         style={[
           styles.navItem,
-          isActive && styles.navItemActive,
-          { transform: [{ scale }] },
+          { transform: [{ scale }, { translateY: liftY }] },
         ]}
       >
+        <Animated.View style={[styles.navItemBackground, { opacity: bgOpacity }]} />
         <Image source={isActive ? tab.iconOn : tab.iconOff} style={styles.navIcon} />
         <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
           {tab.label}
@@ -143,19 +160,26 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     borderTopWidth: 1,
     borderTopColor: '#242424',
-    backgroundColor: '#0A0A0A',
+    backgroundColor: '#161616',
   },
 
   navItem: {
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 14,
   },
 
-  navItemActive: {
-    backgroundColor: '#d0ff0079',
+  navItemBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 14,
+    backgroundColor: '#d0ff0060',
   },
 
   navIcon: {
