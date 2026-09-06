@@ -1,5 +1,49 @@
-import { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+
+function NavTabButton({ tab, isActive, onPress }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  function handlePress() {
+    Animated.sequence([
+      Animated.timing(scale, {
+        toValue: 0.85,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        friction: 20,
+        tension: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    onPress();
+  }
+
+  return (
+    <Pressable
+      accessibilityLabel={tab.label}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: isActive }}
+      hitSlop={6}
+      onPress={handlePress}
+    >
+      <Animated.View
+        style={[
+          styles.navItem,
+          isActive && styles.navItemActive,
+          { transform: [{ scale }] },
+        ]}
+      >
+        <Image source={isActive ? tab.iconOn : tab.iconOff} style={styles.navIcon} />
+        <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
+          {tab.label}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 const TABS = [
   {
@@ -39,29 +83,14 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.bottomNav}>
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.label;
-
-          return (
-            <Pressable
-              accessibilityLabel={tab.label}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isActive }}
-              hitSlop={6}
-              key={tab.label}
-              onPress={() => setActiveTab(tab.label)}
-              style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}
-            >
-              <Image
-                source={isActive ? tab.iconOn : tab.iconOff}
-                style={styles.navIcon}
-              />
-              <Text style={[styles.navLabel, isActive && styles.navActiveText]}>
-                {tab.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {TABS.map((tab) => (
+          <NavTabButton
+            isActive={activeTab === tab.label}
+            key={tab.label}
+            onPress={() => setActiveTab(tab.label)}
+            tab={tab}
+          />
+        ))}
       </View>
     </View>
   );
@@ -89,7 +118,7 @@ const styles = StyleSheet.create({
   },
 
   logoText: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
     letterSpacing: 0.5,
     color: '#F5F5F5',
@@ -120,8 +149,13 @@ const styles = StyleSheet.create({
   navItem: {
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+
+  navItemActive: {
+    backgroundColor: '#d0ff0079',
   },
 
   navIcon: {
@@ -135,12 +169,8 @@ const styles = StyleSheet.create({
     color: '#8A8A8A',
   },
 
-  navActiveText: {
-    color: '#CFFF3D',
+  navLabelActive: {
+    color: '#D2FF00',
     fontWeight: '700',
-  },
-
-  pressed: {
-    opacity: 0.7,
   },
 });
