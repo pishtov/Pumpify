@@ -1,5 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import {
+  getAllWorkoutLogs,
+  getWorkoutDaysInRange,
+  markWorkoutDone,
+  restoreWorkoutLogs,
+  unmarkWorkout,
+} from '../db/db';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -7,13 +17,10 @@ const MONTH_NAMES = [
 ];
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-// TEMPORARY PLACEHOLDER — there are no workout splits or logging yet, so this
-// just seeds a plausible on/off pattern per day so the calendar has something
-// to render. Once real workout logging exists, replace this with a lookup
-// against the actual log (e.g. hasLoggedWorkout(year, month, day)).
-function didWorkout(year, month, day) {
-  const seed = (day * 31 + month * 7 + (year % 100)) % 9;
-  return seed !== 0 && seed !== 4;
+function toDateStr(year, month, day) {
+  const mm = String(month + 1).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  return `${year}-${mm}-${dd}`;
 }
 
 // Builds a real month grid using JS Date math, so weekday alignment and days-
@@ -36,6 +43,7 @@ function Calendar() {
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState(today.getDate());
+  const [doneDays, setDoneDays] = useState(new Set());
 
   const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
   const weeks = useMemo(() => buildMonthGrid(viewYear, viewMonth), [viewYear, viewMonth]);
@@ -45,13 +53,19 @@ function Calendar() {
     (viewYear === today.getFullYear() && viewMonth > today.getMonth()) ||
     (isCurrentMonth && day > today.getDate());
 
-  const workoutCount = useMemo(() => {
-    let count = 0;
-    weeks.flat().forEach((day) => {
-      if (day && !isFutureDay(day) && didWorkout(viewYear, viewMonth, day)) count++;
-    });
-    return count;
-  }, [weeks, viewYear, viewMonth]);
+  const loadMonth = useCallback(async () => {
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const start = toDateStr(viewYear, viewMonth, 1);
+    const end = toDateStr(viewYear, viewMonth, daysInMonth);
+    const dates = await getWorkoutDaysInRange(start, end);
+    setDoneDays(new Set(dates.map((d) => Number(d.slice(-2)))));
+  }, [viewYear, viewMonth]);
+
+  useEffect(() => {
+    loadMonth();
+  }, [loadMonth]);
+
+  const workoutCount = doneDays.size;
 
   function changeMonth(delta) {
     let m = viewMonth + delta;
@@ -61,6 +75,18 @@ function Calendar() {
     setViewMonth(m);
     setViewYear(y);
     setSelectedDay(null);
+  }
+
+  async function handleDayPress(day) {
+    setSelectedDay(day);
+    if (isFutureDay(day)) return;
+    const dateStr = toDateStr(viewYear, viewMonth, day);
+    if (doneDays.has(day)) {
+      await unmarkWorkout(dateStr);
+    } else {
+      await markWorkoutDone(dateStr);
+    }
+    loadMonth();
   }
 
   return (
@@ -91,7 +117,7 @@ function Calendar() {
 
             const isFuture = isFutureDay(day);
             const isToday = isCurrentMonth && day === today.getDate();
-            const done = !isFuture && didWorkout(viewYear, viewMonth, day);
+            const done = doneDays.has(day);
             const isSelected = selectedDay === day;
 
             return (
@@ -99,7 +125,7 @@ function Calendar() {
                 <Pressable
                   accessibilityLabel={`${MONTH_NAMES[viewMonth]} ${day}`}
                   accessibilityRole="button"
-                  onPress={() => setSelectedDay(day)}
+                  onPress={() => handleDayPress(day)}
                   style={[
                     styles.dayPip,
                     done && styles.dayPipDone,
@@ -210,6 +236,82 @@ const TABS = [
   },
 ];
 
+// TEMPORARY PLACEHOLDER — Workouts/Progress screens don't exist yet.
+function PlaceholderScreen({ label }) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.placeholderText}>{label}</Text>
+    </View>
+  );
+}
+
+function ProfileScreen() {
+  async function handleExport() {
+    try {
+      const rows = await getAllWorkoutLogs();
+      const payload = JSON.stringify(
+        { exportedAt: new Date().toISOString(), workoutLogs: rows },
+        null,
+        2
+      );
+      const file = new File(Paths.cache, `pumpify-backup-${Date.now()}.json`);
+      file.create();
+      file.write(payload);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Export Pumpify data',
+        });
+      } else {
+        Alert.alert('Export ready', `Saved to ${file.uri}`);
+      }
+    } catch (error) {
+      Alert.alert('Export failed', error.message);
+    }
+  }
+
+  async function handleImport() {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: 'application/json' });
+      if (result.canceled) return;
+
+      const file = new File(result.assets[0].uri);
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!Array.isArray(data.workoutLogs)) {
+        throw new Error('This file is not a valid Pumpify backup.');
+      }
+
+      await restoreWorkoutLogs(data.workoutLogs);
+      Alert.alert('Import complete', `Restored ${data.workoutLogs.length} workout logs.`);
+    } catch (error) {
+      Alert.alert('Import failed', error.message);
+    }
+  }
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.profileSectionTitle}>Backup & Restore</Text>
+      <Text style={styles.profileSectionSubtitle}>
+        Your data is stored only on this device. Export it to keep a copy, or import a
+        previous backup.
+      </Text>
+
+      <Pressable onPress={handleExport} style={styles.profileButton}>
+        <Text style={styles.profileButtonText}>Export data</Text>
+      </Pressable>
+
+      <Pressable onPress={handleImport} style={[styles.profileButton, styles.profileButtonSecondary]}>
+        <Text style={[styles.profileButtonText, styles.profileButtonTextSecondary]}>
+          Import data
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState('Home');
 
@@ -221,7 +323,9 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Calendar />
+        {activeTab === 'Home' && <Calendar />}
+        {activeTab === 'Profile' && <ProfileScreen />}
+        {activeTab !== 'Home' && activeTab !== 'Profile' && <PlaceholderScreen label={activeTab} />}
       </ScrollView>
 
       <View style={styles.bottomNav}>
@@ -276,6 +380,50 @@ const styles = StyleSheet.create({
     backgroundColor: '#161616',
     borderRadius: 24,
     padding: 16,
+  },
+
+  placeholderText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#8A8A8A',
+    textAlign: 'center',
+    paddingVertical: 40,
+  },
+
+  profileSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#F5F5F5',
+    marginBottom: 8,
+  },
+
+  profileSectionSubtitle: {
+    fontSize: 13,
+    color: '#8A8A8A',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+
+  profileButton: {
+    backgroundColor: '#CFFF3D',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  profileButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0A0A0A',
+  },
+
+  profileButtonSecondary: {
+    backgroundColor: '#242424',
+  },
+
+  profileButtonTextSecondary: {
+    color: '#F5F5F5',
   },
 
   calendarHeaderRow: {
