@@ -59,3 +59,8 @@ Desktop.ini
 # temporary files
 *.tmp
 *.temp
+
+#firebase
+/firebase-debug.log
+/src/firebase/
+/src/db
