@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { initDatabase } from './src/db/db';
 import HomeScreen from './src/screens/homescreen';
+import { initDatabase } from './src/db/db';
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
