@@ -10,6 +10,7 @@ import {
   restoreWorkoutLogs,
   unmarkWorkout,
 } from '../db/db';
+import WorkoutsScreen from './workoutsscreen';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -324,8 +325,9 @@ export default function HomeScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {activeTab === 'Home' && <Calendar />}
+        {activeTab === 'Workouts' && <WorkoutsScreen />}
         {activeTab === 'Profile' && <ProfileScreen />}
-        {activeTab !== 'Home' && activeTab !== 'Profile' && <PlaceholderScreen label={activeTab} />}
+        {activeTab === 'Progress' && <PlaceholderScreen label={activeTab} />}
       </ScrollView>
 
       <View style={styles.bottomNav}>
