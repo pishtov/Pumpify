@@ -61,6 +61,5 @@ Desktop.ini
 *.temp
 
 #firebase
-/firebase-debug.log
-/src/firebase/
-/src/db
+**/firebase.js
+.env
