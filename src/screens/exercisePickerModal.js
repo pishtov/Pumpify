@@ -119,7 +119,7 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
                         onPress={() => toggleExercise(name)}
                         style={[styles.exerciseRow, isChecked && styles.exerciseRowChecked]}
                       >
-                        <Text style={styles.exerciseText}>{name}</Text>
+                        <Text style={styles.exerciseText}>{'+ ' + name}</Text>
                         <Text style={styles.checkmark}>{isChecked ? '✓' : ''}</Text>
                       </Pressable>
                     );
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    marginBottom: 8,
+    marginBottom: 14,
   },
 
   exerciseRowChecked: {
@@ -281,11 +281,12 @@ const styles = StyleSheet.create({
   },
 
   exerciseText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#F5F5F5',
     flex: 1,
     marginRight: 8,
+    textAlign: 'center', 
   },
 
   checkmark: {
