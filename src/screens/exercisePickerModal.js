@@ -2,15 +2,16 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { EXERCISE_CATEGORIES } from '../data/exercises';
 
+const FILTERS = ['All', ...EXERCISE_CATEGORIES.map((category) => category.name)];
+
 function emptyState() {
-  return { checked: new Set(), customList: [], customText: '', search: '' };
+  return { checked: new Set(), search: '', activeFilter: 'All' };
 }
 
-// onConfirm receives an array of exercise names (checked catalog picks plus
-// any custom entries), already deduped.
+// onConfirm receives an array of checked exercise names.
 export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
   const [state, setState] = useState(emptyState);
-  const { checked, customList, customText, search } = state;
+  const { checked, search, activeFilter } = state;
 
   function reset() {
     setState(emptyState());
@@ -33,125 +34,131 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
     });
   }
 
-  function handleAddCustom() {
-    const name = customText.trim();
-    if (!name) return;
-    setState((prev) => ({
-      ...prev,
-      customList: prev.customList.includes(name) ? prev.customList : [...prev.customList, name],
-      customText: '',
-    }));
-  }
-
-  function removeCustom(name) {
-    setState((prev) => ({ ...prev, customList: prev.customList.filter((n) => n !== name) }));
-  }
-
   function handleConfirm() {
-    onConfirm([...checked, ...customList]);
+    onConfirm([...checked]);
     reset();
   }
 
-  const query = search.trim().toLowerCase();
-  const visibleCategories = EXERCISE_CATEGORIES.map((category) => ({
-    ...category,
-    exercises: query
-      ? category.exercises.filter((name) => name.toLowerCase().includes(query))
-      : category.exercises,
-  })).filter((category) => category.exercises.length > 0);
+  const categoriesForFilter =
+    activeFilter === 'All'
+      ? EXERCISE_CATEGORIES
+      : EXERCISE_CATEGORIES.filter((category) => category.name === activeFilter);
 
-  const selectedCount = checked.size + customList.length;
+  const query = search.trim().toLowerCase();
+  const visibleCategories = categoriesForFilter
+    .map((category) => ({
+      ...category,
+      exercises: query
+        ? category.exercises.filter((name) => name.toLowerCase().includes(query))
+        : category.exercises,
+    }))
+    .filter((category) => category.exercises.length > 0);
+
+  const selectedCount = checked.size;
 
   return (
-    <Modal animationType="slide" onRequestClose={handleClose} visible={visible}>
-      <View style={styles.screen}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Add Exercises</Text>
-          <Pressable accessibilityLabel="Close" hitSlop={10} onPress={handleClose}>
-            <Text style={styles.closeIcon}>✕</Text>
-          </Pressable>
-        </View>
-
-        <TextInput
-          onChangeText={(text) => setState((prev) => ({ ...prev, search: text }))}
-          placeholder="Search exercises"
-          placeholderTextColor="#6A6A6A"
-          style={styles.searchInput}
-          value={search}
-        />
-
-        <View style={styles.customRow}>
-          <TextInput
-            onChangeText={(text) => setState((prev) => ({ ...prev, customText: text }))}
-            onSubmitEditing={handleAddCustom}
-            placeholder="Add a custom exercise"
-            placeholderTextColor="#6A6A6A"
-            returnKeyType="done"
-            style={styles.customInput}
-            value={customText}
-          />
-          <Pressable onPress={handleAddCustom} style={styles.customAddButton}>
-            <Text style={styles.customAddButtonText}>Add</Text>
-          </Pressable>
-        </View>
-
-        {customList.length > 0 && (
-          <View style={styles.chipRow}>
-            {customList.map((name) => (
-              <Pressable key={name} onPress={() => removeCustom(name)} style={styles.chip}>
-                <Text style={styles.chipText}>{name} ✕</Text>
-              </Pressable>
-            ))}
+    <Modal animationType="fade" onRequestClose={handleClose} transparent visible={visible}>
+      <View style={styles.overlay}>
+        <View style={styles.card}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Choose an Exercise</Text>
+            <Pressable accessibilityLabel="Close" hitSlop={10} onPress={handleClose}>
+              <Text style={styles.closeIcon}>✕</Text>
+            </Pressable>
           </View>
-        )}
 
-        <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-          {visibleCategories.length === 0 ? (
-            <Text style={styles.mutedText}>No exercises match "{search}".</Text>
-          ) : (
-            visibleCategories.map((category) => (
-              <View key={category.name} style={styles.categoryBlock}>
-                <Text style={styles.categoryTitle}>{category.name}</Text>
-                {category.exercises.map((name) => {
-                  const isChecked = checked.has(name);
-                  return (
-                    <Pressable
-                      key={name}
-                      onPress={() => toggleExercise(name)}
-                      style={[styles.exerciseRow, isChecked && styles.exerciseRowChecked]}
-                    >
-                      <Text style={styles.exerciseText}>{name}</Text>
-                      <Text style={styles.checkmark}>{isChecked ? '✓' : ''}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ))
-          )}
-        </ScrollView>
+          <Pressable onPress={() => {}} style={styles.createButton}>
+            <Text style={styles.createButtonText}>+ Create New Exercise</Text>
+          </Pressable>
 
-        <Pressable
-          disabled={selectedCount === 0}
-          onPress={handleConfirm}
-          style={[styles.confirmButton, selectedCount === 0 && styles.confirmButtonDisabled]}
-        >
-          <Text
-            style={[styles.confirmButtonText, selectedCount === 0 && styles.confirmButtonTextDisabled]}
+          <TextInput
+            onChangeText={(text) => setState((prev) => ({ ...prev, search: text }))}
+            placeholder="Search exercises..."
+            placeholderTextColor="#6A6A6A"
+            style={styles.searchInput}
+            value={search}
+          />
+
+          <Text style={styles.filterLabel}>Filter by Body Part:</Text>
+          <ScrollView
+            contentContainerStyle={styles.filterRow}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterScroll}
           >
-            {selectedCount === 0 ? 'Select exercises' : `Add ${selectedCount} exercise${selectedCount === 1 ? '' : 's'}`}
-          </Text>
-        </Pressable>
+            {FILTERS.map((filter) => {
+              const isActive = activeFilter === filter;
+              return (
+                <Pressable
+                  key={filter}
+                  onPress={() => setState((prev) => ({ ...prev, activeFilter: filter }))}
+                  style={[styles.filterChip, isActive && styles.filterChipActive]}
+                >
+                  <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                    {filter}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+            {visibleCategories.length === 0 ? (
+              <Text style={styles.mutedText}>No exercises match "{search}".</Text>
+            ) : (
+              visibleCategories.map((category) => (
+                <View key={category.name} style={styles.categoryBlock}>
+                  {activeFilter === 'All' && (
+                    <Text style={styles.categoryTitle}>{category.name}</Text>
+                  )}
+                  {category.exercises.map((name) => {
+                    const isChecked = checked.has(name);
+                    return (
+                      <Pressable
+                        key={name}
+                        onPress={() => toggleExercise(name)}
+                        style={[styles.exerciseRow, isChecked && styles.exerciseRowChecked]}
+                      >
+                        <Text style={styles.exerciseText}>{name}</Text>
+                        <Text style={styles.checkmark}>{isChecked ? '✓' : ''}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ))
+            )}
+          </ScrollView>
+
+          <Pressable
+            disabled={selectedCount === 0}
+            onPress={handleConfirm}
+            style={[styles.confirmButton, selectedCount === 0 && styles.confirmButtonDisabled]}
+          >
+            <Text
+              style={[styles.confirmButtonText, selectedCount === 0 && styles.confirmButtonTextDisabled]}
+            >
+              {selectedCount === 0 ? 'Select exercises' : `Add ${selectedCount} exercise${selectedCount === 1 ? '' : 's'}`}
+            </Text>
+          </Pressable>
+        </View>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  overlay: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
-    paddingTop: 56,
+    backgroundColor: '#000000B0',
+    justifyContent: 'center',
     paddingHorizontal: 20,
+  },
+
+  card: {
+    backgroundColor: '#161616',
+    borderRadius: 24,
+    padding: 20,
+    maxHeight: '85%',
   },
 
   header: {
@@ -162,7 +169,7 @@ const styles = StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: '#F5F5F5',
   },
@@ -172,68 +179,71 @@ const styles = StyleSheet.create({
     color: '#8A8A8A',
   },
 
-  searchInput: {
-    backgroundColor: '#161616',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: '#F5F5F5',
-    marginBottom: 10,
-  },
-
-  customRow: {
-    flexDirection: 'row',
+  createButton: {
+    backgroundColor: '#1F1F1F',
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#CFFF3D',
   },
 
-  customInput: {
-    flex: 1,
-    backgroundColor: '#161616',
+  createButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#CFFF3D',
+  },
+
+  searchInput: {
+    backgroundColor: '#1F1F1F',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
     color: '#F5F5F5',
+    marginBottom: 14,
   },
 
-  customAddButton: {
-    backgroundColor: '#242424',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-
-  customAddButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#F5F5F5',
-  },
-
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 10,
-  },
-
-  chip: {
-    backgroundColor: '#CFFF3D',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-
-  chipText: {
+  filterLabel: {
     fontSize: 12,
     fontWeight: '700',
+    color: '#8A8A8A',
+    marginBottom: 8,
+  },
+
+  filterScroll: {
+    marginBottom: 14,
+  },
+
+  filterRow: {
+    gap: 8,
+    paddingRight: 8,
+  },
+
+  filterChip: {
+    backgroundColor: '#1F1F1F',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+  },
+
+  filterChipActive: {
+    backgroundColor: '#CFFF3D',
+  },
+
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D0D0D0',
+  },
+
+  filterChipTextActive: {
     color: '#0A0A0A',
   },
 
   list: {
-    flex: 1,
+    marginBottom: 8,
   },
 
   mutedText: {
@@ -259,7 +269,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#161616',
+    backgroundColor: '#1F1F1F',
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -271,7 +281,7 @@ const styles = StyleSheet.create({
   },
 
   exerciseText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#F5F5F5',
     flex: 1,
@@ -288,9 +298,9 @@ const styles = StyleSheet.create({
   confirmButton: {
     backgroundColor: '#CFFF3D',
     borderRadius: 14,
-    paddingVertical: 16,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginVertical: 16,
+    marginTop: 4,
   },
 
   confirmButtonDisabled: {
