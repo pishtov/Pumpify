@@ -80,12 +80,7 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
           />
 
           <Text style={styles.filterLabel}>Filter by Body Part:</Text>
-          <ScrollView
-            contentContainerStyle={styles.filterRow}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.filterScroll}
-          >
+          <View style={styles.filterRow}>
             {FILTERS.map((filter) => {
               const isActive = activeFilter === filter;
               return (
@@ -100,7 +95,7 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </View>
 
           <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
             {visibleCategories.length === 0 ? (
@@ -212,20 +207,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  filterScroll: {
-    marginBottom: 14,
-  },
-
   filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
-    paddingRight: 8,
+    marginBottom: 14,
   },
 
   filterChip: {
     backgroundColor: '#1F1F1F',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 18,
+    paddingVertical: 8,
   },
 
   filterChipActive: {
