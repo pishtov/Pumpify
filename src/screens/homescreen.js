@@ -3,13 +3,8 @@ import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View }
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import {
-  getAllWorkoutLogs,
-  getWorkoutDaysInRange,
-  markWorkoutDone,
-  restoreWorkoutLogs,
-  unmarkWorkout,
-} from '../db/db';
+import { getAllWorkoutLogs, getWorkoutDaysInRange, restoreWorkoutLogs } from '../db/db';
+import DayLogModal from './dayLogModal';
 import WorkoutsScreen from './workoutsscreen';
 
 const MONTH_NAMES = [
@@ -39,12 +34,13 @@ function buildMonthGrid(year, month) {
   return weeks;
 }
 
-function Calendar() {
+function Calendar({ onCreateSplit }) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState(today.getDate());
   const [doneDays, setDoneDays] = useState(new Set());
+  const [modalDate, setModalDate] = useState(null);
 
   const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
   const weeks = useMemo(() => buildMonthGrid(viewYear, viewMonth), [viewYear, viewMonth]);
@@ -78,16 +74,10 @@ function Calendar() {
     setSelectedDay(null);
   }
 
-  async function handleDayPress(day) {
+  function handleDayPress(day) {
     setSelectedDay(day);
     if (isFutureDay(day)) return;
-    const dateStr = toDateStr(viewYear, viewMonth, day);
-    if (doneDays.has(day)) {
-      await unmarkWorkout(dateStr);
-    } else {
-      await markWorkoutDone(dateStr);
-    }
-    loadMonth();
+    setModalDate(toDateStr(viewYear, viewMonth, day));
   }
 
   return (
@@ -149,6 +139,13 @@ function Calendar() {
           })}
         </View>
       ))}
+
+      <DayLogModal
+        date={modalDate}
+        onChange={loadMonth}
+        onClose={() => setModalDate(null)}
+        onCreateSplit={onCreateSplit}
+      />
     </View>
   );
 }
@@ -324,7 +321,7 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {activeTab === 'Home' && <Calendar />}
+        {activeTab === 'Home' && <Calendar onCreateSplit={() => setActiveTab('Workouts')} />}
         {activeTab === 'Workouts' && <WorkoutsScreen />}
         {activeTab === 'Profile' && <ProfileScreen />}
         {activeTab === 'Progress' && <PlaceholderScreen label={activeTab} />}

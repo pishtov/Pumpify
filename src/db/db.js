@@ -18,11 +18,6 @@ export async function initDatabase() {
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
-    CREATE TABLE IF NOT EXISTS workout_logs (
-      date TEXT PRIMARY KEY NOT NULL,
-      split_id TEXT,
-      logged_at TEXT NOT NULL
-    );
     CREATE TABLE IF NOT EXISTS splits (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -40,22 +35,84 @@ export async function initDatabase() {
       exercise_order INTEGER NOT NULL,
       name TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS workout_logs (
+      date TEXT PRIMARY KEY NOT NULL,
+      split_id TEXT,
+      split_day_id INTEGER REFERENCES split_days(id) ON DELETE SET NULL,
+      logged_at TEXT NOT NULL
+    );
   `);
+
+  // Migration for installs from before split_day_id existed — ALTER TABLE
+  // ADD COLUMN is safe to skip if it's already there (re-running would error).
+  const columns = await db.getAllAsync(`PRAGMA table_info(workout_logs)`);
+  const hasSplitDayId = columns.some((column) => column.name === 'split_day_id');
+  if (!hasSplitDayId) {
+    await db.execAsync(
+      `ALTER TABLE workout_logs ADD COLUMN split_day_id INTEGER REFERENCES split_days(id) ON DELETE SET NULL;`
+    );
+  }
 }
 
-// date is a 'YYYY-MM-DD' string. splitId is optional for now since splits
-// don't exist yet — pass null until that feature exists.
-export async function markWorkoutDone(date, splitId = null) {
+// Logs a specific split day (e.g. "PPL — Push") as the workout done on this
+// date. date is a 'YYYY-MM-DD' string.
+export async function logWorkoutDay(date, splitDayId) {
   const db = await getDb();
   await db.runAsync(
-    `INSERT OR REPLACE INTO workout_logs (date, split_id, logged_at) VALUES (?, ?, ?)`,
-    [date, splitId, new Date().toISOString()]
+    `INSERT OR REPLACE INTO workout_logs (date, split_id, split_day_id, logged_at) VALUES (?, NULL, ?, ?)`,
+    [date, splitDayId, new Date().toISOString()]
   );
 }
 
-export async function unmarkWorkout(date) {
+export async function clearWorkoutLog(date) {
   const db = await getDb();
   await db.runAsync(`DELETE FROM workout_logs WHERE date = ?`, [date]);
+}
+
+// Flattened list of every split's days, newest split first — what the "which
+// workout did you do" picker renders.
+export async function getAllSplitDays() {
+  const db = await getDb();
+  return db.getAllAsync(`
+    SELECT split_days.id AS day_id, split_days.label AS day_label,
+           splits.id AS split_id, splits.name AS split_name
+    FROM split_days
+    JOIN splits ON splits.id = split_days.split_id
+    ORDER BY splits.created_at DESC, split_days.day_order ASC
+  `);
+}
+
+// Returns null if nothing is logged for this date. If the log has no
+// split_day_id (a legacy plain toggle, or the linked split was since
+// deleted), splitName/dayLabel/exercises come back null/empty.
+export async function getWorkoutLogDetail(date) {
+  const db = await getDb();
+  const log = await db.getFirstAsync(
+    `SELECT date, split_day_id, logged_at FROM workout_logs WHERE date = ?`,
+    [date]
+  );
+  if (!log) return null;
+
+  if (!log.split_day_id) {
+    return { ...log, splitName: null, dayLabel: null, exercises: [] };
+  }
+
+  const day = await db.getFirstAsync(
+    `SELECT split_days.label AS day_label, splits.name AS split_name
+     FROM split_days JOIN splits ON splits.id = split_days.split_id
+     WHERE split_days.id = ?`,
+    [log.split_day_id]
+  );
+  if (!day) {
+    return { ...log, splitName: null, dayLabel: null, exercises: [] };
+  }
+
+  const exercises = await db.getAllAsync(
+    `SELECT id, name FROM exercises WHERE split_day_id = ? ORDER BY exercise_order`,
+    [log.split_day_id]
+  );
+
+  return { ...log, splitName: day.split_name, dayLabel: day.day_label, exercises };
 }
 
 // Returns an array of 'YYYY-MM-DD' strings for every completed day between
