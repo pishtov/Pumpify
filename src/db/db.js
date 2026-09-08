@@ -65,16 +65,27 @@ export async function getSessionExercises(date) {
   );
 }
 
-export async function addExercise(date, name) {
+// names is an array of exercise names (from the picker's catalog checks
+// and/or custom entries), appended in order after whatever's already logged.
+export async function addExercises(date, names) {
+  if (names.length === 0) return;
   const db = await getDb();
-  const countRow = await db.getFirstAsync(
-    `SELECT COUNT(*) AS count FROM session_exercises WHERE date = ?`,
-    [date]
-  );
-  await db.runAsync(
-    `INSERT INTO session_exercises (date, exercise_order, name, logged_at) VALUES (?, ?, ?, ?)`,
-    [date, countRow.count, name, new Date().toISOString()]
-  );
+  // Exclusive transaction — see note in copyPreviousWorkout below.
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    const countRow = await txn.getFirstAsync(
+      `SELECT COUNT(*) AS count FROM session_exercises WHERE date = ?`,
+      [date]
+    );
+    let order = countRow.count;
+    const now = new Date().toISOString();
+    for (const name of names) {
+      await txn.runAsync(
+        `INSERT INTO session_exercises (date, exercise_order, name, logged_at) VALUES (?, ?, ?, ?)`,
+        [date, order, name, now]
+      );
+      order++;
+    }
+  });
 }
 
 export async function removeExercise(exerciseId) {

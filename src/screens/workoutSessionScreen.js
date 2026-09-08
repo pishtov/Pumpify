@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
-  addExercise,
+  addExercises,
   copyPreviousWorkout,
   getPreviousSessionDate,
   getSessionExercises,
   removeExercise,
 } from '../db/db';
 import { formatDateHeading, shiftDateStr, todayDateStr } from '../utils/date';
+import ExercisePickerModal from './exercisePickerModal';
 
 // date is a 'YYYY-MM-DD' string for the day currently being viewed.
 // onChangeDate lets the ‹ › arrows move to an adjacent day without leaving
@@ -15,12 +16,10 @@ import { formatDateHeading, shiftDateStr, todayDateStr } from '../utils/date';
 export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
   const [exercises, setExercises] = useState([]);
   const [previousDate, setPreviousDate] = useState(null);
-  const [adding, setAdding] = useState(false);
-  const [newExerciseText, setNewExerciseText] = useState('');
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   useEffect(() => {
-    setAdding(false);
-    setNewExerciseText('');
+    setPickerVisible(false);
     reload();
     getPreviousSessionDate(date).then(setPreviousDate);
   }, [date]);
@@ -29,11 +28,9 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
     setExercises(await getSessionExercises(date));
   }
 
-  async function handleAddExercise() {
-    const name = newExerciseText.trim();
-    if (!name) return;
-    await addExercise(date, name);
-    setNewExerciseText('');
+  async function handleConfirmExercises(names) {
+    setPickerVisible(false);
+    await addExercises(date, names);
     await reload();
   }
 
@@ -94,26 +91,8 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
             ))
           )}
 
-          {adding && (
-            <View style={styles.addRow}>
-              <TextInput
-                autoFocus
-                onChangeText={setNewExerciseText}
-                onSubmitEditing={handleAddExercise}
-                placeholder="Exercise name"
-                placeholderTextColor="#6A6A6A"
-                returnKeyType="done"
-                style={styles.input}
-                value={newExerciseText}
-              />
-              <Pressable onPress={handleAddExercise} style={styles.addConfirmButton}>
-                <Text style={styles.addConfirmButtonText}>Add</Text>
-              </Pressable>
-            </View>
-          )}
-
-          <Pressable onPress={() => setAdding((prev) => !prev)} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>{adding ? 'Done adding' : '+ Add Exercise'}</Text>
+          <Pressable onPress={() => setPickerVisible(true)} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>+ Add Exercise</Text>
           </Pressable>
 
           {previousDate && (
@@ -123,6 +102,12 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
           )}
         </View>
       </ScrollView>
+
+      <ExercisePickerModal
+        onClose={() => setPickerVisible(false)}
+        onConfirm={handleConfirmExercises}
+        visible={pickerVisible}
+      />
     </View>
   );
 }
@@ -220,37 +205,6 @@ const styles = StyleSheet.create({
   removeText: {
     fontSize: 13,
     color: '#8A8A8A',
-  },
-
-  addRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-    marginBottom: 8,
-  },
-
-  input: {
-    flex: 1,
-    backgroundColor: '#1F1F1F',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: '#F5F5F5',
-  },
-
-  addConfirmButton: {
-    backgroundColor: '#CFFF3D',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-
-  addConfirmButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0A0A0A',
   },
 
   primaryButton: {
