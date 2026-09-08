@@ -3,9 +3,8 @@ import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View }
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { getAllWorkoutLogs, getWorkoutDaysInRange, restoreWorkoutLogs } from '../db/db';
-import DayLogModal from './dayLogModal';
-import WorkoutsScreen from './workoutsscreen';
+import { getAllSessionExercises, getWorkoutDaysInRange, restoreSessionExercises } from '../db/db';
+import WorkoutSessionModal from './workoutSessionModal';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -34,7 +33,7 @@ function buildMonthGrid(year, month) {
   return weeks;
 }
 
-function Calendar({ onCreateSplit }) {
+function Calendar() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -140,12 +139,7 @@ function Calendar({ onCreateSplit }) {
         </View>
       ))}
 
-      <DayLogModal
-        date={modalDate}
-        onChange={loadMonth}
-        onClose={() => setModalDate(null)}
-        onCreateSplit={onCreateSplit}
-      />
+      <WorkoutSessionModal date={modalDate} onChange={loadMonth} onClose={() => setModalDate(null)} />
     </View>
   );
 }
@@ -246,9 +240,9 @@ function PlaceholderScreen({ label }) {
 function ProfileScreen() {
   async function handleExport() {
     try {
-      const rows = await getAllWorkoutLogs();
+      const rows = await getAllSessionExercises();
       const payload = JSON.stringify(
-        { exportedAt: new Date().toISOString(), workoutLogs: rows },
+        { exportedAt: new Date().toISOString(), sessionExercises: rows },
         null,
         2
       );
@@ -278,12 +272,12 @@ function ProfileScreen() {
       const text = await file.text();
       const data = JSON.parse(text);
 
-      if (!Array.isArray(data.workoutLogs)) {
+      if (!Array.isArray(data.sessionExercises)) {
         throw new Error('This file is not a valid Pumpify backup.');
       }
 
-      await restoreWorkoutLogs(data.workoutLogs);
-      Alert.alert('Import complete', `Restored ${data.workoutLogs.length} workout logs.`);
+      await restoreSessionExercises(data.sessionExercises);
+      Alert.alert('Import complete', `Restored ${data.sessionExercises.length} logged exercises.`);
     } catch (error) {
       Alert.alert('Import failed', error.message);
     }
@@ -321,10 +315,11 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {activeTab === 'Home' && <Calendar onCreateSplit={() => setActiveTab('Workouts')} />}
-        {activeTab === 'Workouts' && <WorkoutsScreen />}
+        {activeTab === 'Home' && <Calendar />}
         {activeTab === 'Profile' && <ProfileScreen />}
-        {activeTab === 'Progress' && <PlaceholderScreen label={activeTab} />}
+        {(activeTab === 'Workouts' || activeTab === 'Progress') && (
+          <PlaceholderScreen label={activeTab} />
+        )}
       </ScrollView>
 
       <View style={styles.bottomNav}>

@@ -15,201 +15,138 @@ async function getDb() {
 // Creates tables if they don't exist yet — safe to call every launch.
 export async function initDatabase() {
   const db = await getDb();
+  await db.execAsync(`PRAGMA journal_mode = WAL;`);
+
+  // One-time migration away from the old splits/workout_logs schema.
+  const legacyTables = await db.getAllAsync(
+    `SELECT name FROM sqlite_master WHERE type = 'table'
+     AND name IN ('splits', 'split_days', 'exercises', 'workout_logs')`
+  );
+  if (legacyTables.length > 0) {
+    await db.execAsync(`
+      DROP TABLE IF EXISTS exercises;
+      DROP TABLE IF EXISTS split_days;
+      DROP TABLE IF EXISTS splits;
+      DROP TABLE IF EXISTS workout_logs;
+    `);
+  }
+
   await db.execAsync(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA foreign_keys = ON;
-    CREATE TABLE IF NOT EXISTS splits (
+    CREATE TABLE IF NOT EXISTS session_exercises (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS split_days (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      split_id INTEGER NOT NULL REFERENCES splits(id) ON DELETE CASCADE,
-      day_order INTEGER NOT NULL,
-      label TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS exercises (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      split_day_id INTEGER NOT NULL REFERENCES split_days(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
       exercise_order INTEGER NOT NULL,
-      name TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS workout_logs (
-      date TEXT PRIMARY KEY NOT NULL,
-      split_id TEXT,
-      split_day_id INTEGER REFERENCES split_days(id) ON DELETE SET NULL,
+      name TEXT NOT NULL,
       logged_at TEXT NOT NULL
     );
-  `);
-
-  // Migration for installs from before split_day_id existed — ALTER TABLE
-  // ADD COLUMN is safe to skip if it's already there (re-running would error).
-  const columns = await db.getAllAsync(`PRAGMA table_info(workout_logs)`);
-  const hasSplitDayId = columns.some((column) => column.name === 'split_day_id');
-  if (!hasSplitDayId) {
-    await db.execAsync(
-      `ALTER TABLE workout_logs ADD COLUMN split_day_id INTEGER REFERENCES split_days(id) ON DELETE SET NULL;`
-    );
-  }
-}
-
-// Logs a specific split day (e.g. "PPL — Push") as the workout done on this
-// date. date is a 'YYYY-MM-DD' string.
-export async function logWorkoutDay(date, splitDayId) {
-  const db = await getDb();
-  await db.runAsync(
-    `INSERT OR REPLACE INTO workout_logs (date, split_id, split_day_id, logged_at) VALUES (?, NULL, ?, ?)`,
-    [date, splitDayId, new Date().toISOString()]
-  );
-}
-
-export async function clearWorkoutLog(date) {
-  const db = await getDb();
-  await db.runAsync(`DELETE FROM workout_logs WHERE date = ?`, [date]);
-}
-
-// Flattened list of every split's days, newest split first — what the "which
-// workout did you do" picker renders.
-export async function getAllSplitDays() {
-  const db = await getDb();
-  return db.getAllAsync(`
-    SELECT split_days.id AS day_id, split_days.label AS day_label,
-           splits.id AS split_id, splits.name AS split_name
-    FROM split_days
-    JOIN splits ON splits.id = split_days.split_id
-    ORDER BY splits.created_at DESC, split_days.day_order ASC
+    CREATE INDEX IF NOT EXISTS idx_session_exercises_date ON session_exercises(date);
   `);
 }
 
-// Returns null if nothing is logged for this date. If the log has no
-// split_day_id (a legacy plain toggle, or the linked split was since
-// deleted), splitName/dayLabel/exercises come back null/empty.
-export async function getWorkoutLogDetail(date) {
-  const db = await getDb();
-  const log = await db.getFirstAsync(
-    `SELECT date, split_day_id, logged_at FROM workout_logs WHERE date = ?`,
-    [date]
-  );
-  if (!log) return null;
-
-  if (!log.split_day_id) {
-    return { ...log, splitName: null, dayLabel: null, exercises: [] };
-  }
-
-  const day = await db.getFirstAsync(
-    `SELECT split_days.label AS day_label, splits.name AS split_name
-     FROM split_days JOIN splits ON splits.id = split_days.split_id
-     WHERE split_days.id = ?`,
-    [log.split_day_id]
-  );
-  if (!day) {
-    return { ...log, splitName: null, dayLabel: null, exercises: [] };
-  }
-
-  const exercises = await db.getAllAsync(
-    `SELECT id, name FROM exercises WHERE split_day_id = ? ORDER BY exercise_order`,
-    [log.split_day_id]
-  );
-
-  return { ...log, splitName: day.split_name, dayLabel: day.day_label, exercises };
-}
-
-// Returns an array of 'YYYY-MM-DD' strings for every completed day between
-// startDate and endDate (inclusive). This is what the calendar will call
-// once per visible month, instead of guessing with a placeholder function.
+// Returns an array of 'YYYY-MM-DD' strings for every date with at least one
+// logged exercise between startDate and endDate (inclusive) — what the
+// calendar calls once per visible month to know which days to light up.
 export async function getWorkoutDaysInRange(startDate, endDate) {
   const db = await getDb();
   const rows = await db.getAllAsync(
-    `SELECT date FROM workout_logs WHERE date >= ? AND date <= ? ORDER BY date`,
+    `SELECT DISTINCT date FROM session_exercises WHERE date >= ? AND date <= ? ORDER BY date`,
     [startDate, endDate]
   );
   return rows.map((row) => row.date);
 }
 
-// Returns every row in the table, unfiltered — used by the export feature to
-// back up the full history, not just what the visible calendar range needs.
-export async function getAllWorkoutLogs() {
+// date is a 'YYYY-MM-DD' string. Returns the exercises logged for that date,
+// in the order they were added.
+export async function getSessionExercises(date) {
   const db = await getDb();
-  return db.getAllAsync(`SELECT date, split_id, logged_at FROM workout_logs ORDER BY date`);
+  return db.getAllAsync(
+    `SELECT id, name FROM session_exercises WHERE date = ? ORDER BY exercise_order`,
+    [date]
+  );
 }
 
-// Bulk-inserts rows from an imported backup file. Uses INSERT OR REPLACE so
-// re-importing the same backup twice is safe (no duplicate-key errors), and
-// wraps everything in one transaction so a mid-import crash can't leave the
-// database half-restored.
-export async function restoreWorkoutLogs(rows) {
+export async function addExercise(date, name) {
   const db = await getDb();
-  // Exclusive transaction: locks out other queries (e.g. the calendar re-loading
-  // mid-import) that could otherwise interleave into this transaction and corrupt
-  // its native state. Statements must go through `txn`, not `db`, while inside it.
+  const countRow = await db.getFirstAsync(
+    `SELECT COUNT(*) AS count FROM session_exercises WHERE date = ?`,
+    [date]
+  );
+  await db.runAsync(
+    `INSERT INTO session_exercises (date, exercise_order, name, logged_at) VALUES (?, ?, ?, ?)`,
+    [date, countRow.count, name, new Date().toISOString()]
+  );
+}
+
+export async function removeExercise(exerciseId) {
+  const db = await getDb();
+  await db.runAsync(`DELETE FROM session_exercises WHERE id = ?`, [exerciseId]);
+}
+
+// Most recent date before `beforeDate` that has any logged exercises, or
+// null if there isn't one — used to decide whether "Copy Previous Workout"
+// should be offered.
+export async function getPreviousSessionDate(beforeDate) {
+  const db = await getDb();
+  const row = await db.getFirstAsync(
+    `SELECT DISTINCT date FROM session_exercises WHERE date < ? ORDER BY date DESC LIMIT 1`,
+    [beforeDate]
+  );
+  return row ? row.date : null;
+}
+
+// Appends every exercise from the most recent earlier session onto `date`'s
+// session. No-ops if there's no earlier session.
+export async function copyPreviousWorkout(date) {
+  const db = await getDb();
+  const previousDate = await getPreviousSessionDate(date);
+  if (!previousDate) return;
+
+  // Exclusive transaction: locks out other queries that could otherwise
+  // interleave into this transaction and corrupt its native state.
   await db.withExclusiveTransactionAsync(async (txn) => {
+    const previousExercises = await txn.getAllAsync(
+      `SELECT name FROM session_exercises WHERE date = ? ORDER BY exercise_order`,
+      [previousDate]
+    );
+    const countRow = await txn.getFirstAsync(
+      `SELECT COUNT(*) AS count FROM session_exercises WHERE date = ?`,
+      [date]
+    );
+
+    let order = countRow.count;
+    const now = new Date().toISOString();
+    for (const exercise of previousExercises) {
+      await txn.runAsync(
+        `INSERT INTO session_exercises (date, exercise_order, name, logged_at) VALUES (?, ?, ?, ?)`,
+        [date, order, exercise.name, now]
+      );
+      order++;
+    }
+  });
+}
+
+// Returns every logged exercise, unfiltered — used by the export feature to
+// back up the full history, not just what the visible calendar range needs.
+export async function getAllSessionExercises() {
+  const db = await getDb();
+  return db.getAllAsync(
+    `SELECT date, exercise_order, name, logged_at FROM session_exercises ORDER BY date, exercise_order`
+  );
+}
+
+// Fully replaces the local history with the contents of an imported backup
+// file — simplest correct behavior since exercise ids won't match across
+// devices, so there's nothing meaningful to merge row-by-row.
+export async function restoreSessionExercises(rows) {
+  const db = await getDb();
+  // Exclusive transaction — see note in copyPreviousWorkout above.
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.runAsync(`DELETE FROM session_exercises`);
     for (const row of rows) {
       await txn.runAsync(
-        `INSERT OR REPLACE INTO workout_logs (date, split_id, logged_at) VALUES (?, ?, ?)`,
-        [row.date, row.split_id ?? null, row.logged_at]
+        `INSERT INTO session_exercises (date, exercise_order, name, logged_at) VALUES (?, ?, ?, ?)`,
+        [row.date, row.exercise_order, row.name, row.logged_at]
       );
     }
   });
-}
-
-// days is [{ label, exercises: [exerciseName, ...] }, ...], already in the
-// order the user built them in — day_order/exercise_order just mirror that.
-export async function createSplit(name, days) {
-  const db = await getDb();
-  // Exclusive transaction — see note in restoreWorkoutLogs above.
-  await db.withExclusiveTransactionAsync(async (txn) => {
-    const splitResult = await txn.runAsync(
-      `INSERT INTO splits (name, created_at) VALUES (?, ?)`,
-      [name, new Date().toISOString()]
-    );
-    const splitId = splitResult.lastInsertRowId;
-
-    for (let dayIndex = 0; dayIndex < days.length; dayIndex++) {
-      const day = days[dayIndex];
-      const dayResult = await txn.runAsync(
-        `INSERT INTO split_days (split_id, day_order, label) VALUES (?, ?, ?)`,
-        [splitId, dayIndex, day.label]
-      );
-      const dayId = dayResult.lastInsertRowId;
-
-      for (let exIndex = 0; exIndex < day.exercises.length; exIndex++) {
-        await txn.runAsync(
-          `INSERT INTO exercises (split_day_id, exercise_order, name) VALUES (?, ?, ?)`,
-          [dayId, exIndex, day.exercises[exIndex]]
-        );
-      }
-    }
-  });
-}
-
-export async function getSplits() {
-  const db = await getDb();
-  return db.getAllAsync(`SELECT id, name, created_at FROM splits ORDER BY created_at DESC`);
-}
-
-// Returns the split's days in order, each with its exercises in order —
-// everything the Workouts screen needs to render one split's detail view.
-export async function getSplitDetail(splitId) {
-  const db = await getDb();
-  const days = await db.getAllAsync(
-    `SELECT id, day_order, label FROM split_days WHERE split_id = ? ORDER BY day_order`,
-    [splitId]
-  );
-  const exercises = await db.getAllAsync(
-    `SELECT id, split_day_id, exercise_order, name FROM exercises
-     WHERE split_day_id IN (SELECT id FROM split_days WHERE split_id = ?)
-     ORDER BY exercise_order`,
-    [splitId]
-  );
-  return days.map((day) => ({
-    ...day,
-    exercises: exercises.filter((exercise) => exercise.split_day_id === day.id),
-  }));
-}
-
-// Cascades to split_days and exercises via the ON DELETE CASCADE foreign keys.
-export async function deleteSplit(splitId) {
-  const db = await getDb();
-  await db.runAsync(`DELETE FROM splits WHERE id = ?`, [splitId]);
 }
