@@ -4,19 +4,14 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { getAllSessionExercises, getWorkoutDaysInRange, restoreSessionExercises } from '../db/db';
-import WorkoutSessionModal from './workoutSessionModal';
+import { toDateStr } from '../utils/date';
+import WorkoutSessionScreen from './workoutSessionScreen';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
-function toDateStr(year, month, day) {
-  const mm = String(month + 1).padStart(2, '0');
-  const dd = String(day).padStart(2, '0');
-  return `${year}-${mm}-${dd}`;
-}
 
 // Builds a real month grid using JS Date math, so weekday alignment and days-
 // in-month (including leap years) are always correct — no hardcoded layouts.
@@ -33,13 +28,12 @@ function buildMonthGrid(year, month) {
   return weeks;
 }
 
-function Calendar() {
+function Calendar({ onSelectDay }) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState(today.getDate());
   const [doneDays, setDoneDays] = useState(new Set());
-  const [modalDate, setModalDate] = useState(null);
 
   const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
   const weeks = useMemo(() => buildMonthGrid(viewYear, viewMonth), [viewYear, viewMonth]);
@@ -76,7 +70,7 @@ function Calendar() {
   function handleDayPress(day) {
     setSelectedDay(day);
     if (isFutureDay(day)) return;
-    setModalDate(toDateStr(viewYear, viewMonth, day));
+    onSelectDay(toDateStr(viewYear, viewMonth, day));
   }
 
   return (
@@ -138,8 +132,6 @@ function Calendar() {
           })}
         </View>
       ))}
-
-      <WorkoutSessionModal date={modalDate} onChange={loadMonth} onClose={() => setModalDate(null)} />
     </View>
   );
 }
@@ -306,6 +298,17 @@ function ProfileScreen() {
 
 export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState('Home');
+  const [viewingDate, setViewingDate] = useState(null);
+
+  if (viewingDate) {
+    return (
+      <WorkoutSessionScreen
+        date={viewingDate}
+        onBack={() => setViewingDate(null)}
+        onChangeDate={setViewingDate}
+      />
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -315,7 +318,7 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {activeTab === 'Home' && <Calendar />}
+        {activeTab === 'Home' && <Calendar onSelectDay={setViewingDate} />}
         {activeTab === 'Profile' && <ProfileScreen />}
         {(activeTab === 'Workouts' || activeTab === 'Progress') && (
           <PlaceholderScreen label={activeTab} />
