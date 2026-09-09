@@ -83,24 +83,24 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
           ) : (
             exercises.map((exercise) => (
               <View key={exercise.id} style={styles.exerciseRow}>
-                <Text style={styles.exerciseText}>{exercise.name}</Text>
+                <Text style={styles.exerciseText}>{'⠿ ' + exercise.name}</Text>
                 <Pressable hitSlop={8} onPress={() => handleRemoveExercise(exercise.id)}>
                   <Text style={styles.removeText}>✕</Text>
                 </Pressable>
               </View>
             ))
           )}
-
-          <Pressable onPress={() => setPickerVisible(true)} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>+ Add Exercise</Text>
-          </Pressable>
-
-          {previousDate && (
-            <Pressable onPress={handleCopyPrevious} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Copy Previous Workout</Text>
-            </Pressable>
-          )}
         </View>
+
+        <Pressable onPress={() => setPickerVisible(true)} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>+ Add Exercise</Text>
+        </Pressable>
+
+        {previousDate && (
+          <Pressable onPress={handleCopyPrevious} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>Copy Previous Workout</Text>
+          </Pressable>
+        )}
       </ScrollView>
 
       <ExercisePickerModal
@@ -197,7 +197,8 @@ const styles = StyleSheet.create({
   },
 
   exerciseText: {
-    fontSize: 13,
+    fontSize: 18,
+    flex: 1,
     fontWeight: '600',
     color: '#F5F5F5',
   },
@@ -210,13 +211,13 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: '#CFFF3D',
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 20,
   },
 
   primaryButtonText: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '700',
     color: '#0A0A0A',
   },
