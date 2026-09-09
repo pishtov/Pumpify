@@ -15,7 +15,7 @@ async function getDb() {
 // Creates tables if they don't exist yet — safe to call every launch.
 export async function initDatabase() {
   const db = await getDb();
-  await db.execAsync(`PRAGMA journal_mode = WAL;`);
+  await db.execAsync(`PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;`);
 
   // One-time migration away from the old splits/workout_logs schema.
   const legacyTables = await db.getAllAsync(
@@ -40,6 +40,16 @@ export async function initDatabase() {
       logged_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_session_exercises_date ON session_exercises(date);
+    CREATE TABLE IF NOT EXISTS exercise_sets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_exercise_id INTEGER NOT NULL REFERENCES session_exercises(id) ON DELETE CASCADE,
+      set_order INTEGER NOT NULL,
+      weight REAL,
+      reps INTEGER,
+      rpe REAL,
+      logged_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_exercise_sets_session_exercise_id ON exercise_sets(session_exercise_id);
   `);
 }
 
@@ -62,6 +72,41 @@ export async function getSessionExercises(date) {
   return db.getAllAsync(
     `SELECT id, name FROM session_exercises WHERE date = ? ORDER BY exercise_order`,
     [date]
+  );
+}
+
+// Same as getSessionExercises, but each exercise also carries its logged
+// sets (in order) — what the session screen renders per exercise's dropdown.
+export async function getExercisesWithSets(date) {
+  const db = await getDb();
+  const exercises = await db.getAllAsync(
+    `SELECT id, name FROM session_exercises WHERE date = ? ORDER BY exercise_order`,
+    [date]
+  );
+  const sets = await db.getAllAsync(
+    `SELECT id, session_exercise_id, set_order, weight, reps, rpe
+     FROM exercise_sets
+     WHERE session_exercise_id IN (SELECT id FROM session_exercises WHERE date = ?)
+     ORDER BY set_order`,
+    [date]
+  );
+  return exercises.map((exercise) => ({
+    ...exercise,
+    sets: sets.filter((set) => set.session_exercise_id === exercise.id),
+  }));
+}
+
+// values is { weight, reps, rpe } — rpe may be null. Appends as the next set
+// for this exercise instance.
+export async function logSet(sessionExerciseId, { weight, reps, rpe }) {
+  const db = await getDb();
+  const countRow = await db.getFirstAsync(
+    `SELECT COUNT(*) AS count FROM exercise_sets WHERE session_exercise_id = ?`,
+    [sessionExerciseId]
+  );
+  await db.runAsync(
+    `INSERT INTO exercise_sets (session_exercise_id, set_order, weight, reps, rpe, logged_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    [sessionExerciseId, countRow.count, weight, reps, rpe, new Date().toISOString()]
   );
 }
 

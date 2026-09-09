@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   addExercises,
   copyPreviousWorkout,
+  getExercisesWithSets,
   getPreviousSessionDate,
-  getSessionExercises,
+  logSet,
   removeExercise,
 } from '../db/db';
 import { formatDateHeading, shiftDateStr, todayDateStr } from '../utils/date';
 import ExercisePickerModal from './exercisePickerModal';
+
+function emptySetInput() {
+  return { weight: '', reps: '' };
+}
 
 // date is a 'YYYY-MM-DD' string for the day currently being viewed.
 // onChangeDate lets the ‹ › arrows move to an adjacent day without leaving
@@ -17,15 +22,19 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
   const [exercises, setExercises] = useState([]);
   const [previousDate, setPreviousDate] = useState(null);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [expandedIds, setExpandedIds] = useState(new Set());
+  const [setInputs, setSetInputs] = useState({});
 
   useEffect(() => {
     setPickerVisible(false);
+    setExpandedIds(new Set());
+    setSetInputs({});
     reload();
     getPreviousSessionDate(date).then(setPreviousDate);
   }, [date]);
 
   async function reload() {
-    setExercises(await getSessionExercises(date));
+    setExercises(await getExercisesWithSets(date));
   }
 
   async function handleConfirmExercises(names) {
@@ -41,6 +50,36 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
 
   async function handleCopyPrevious() {
     await copyPreviousWorkout(date);
+    await reload();
+  }
+
+  function toggleExpanded(exerciseId) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(exerciseId)) {
+        next.delete(exerciseId);
+      } else {
+        next.add(exerciseId);
+      }
+      return next;
+    });
+  }
+
+  function updateSetInput(exerciseId, field, text) {
+    setSetInputs((prev) => ({
+      ...prev,
+      [exerciseId]: { ...(prev[exerciseId] || emptySetInput()), [field]: text },
+    }));
+  }
+
+  async function handleLogSet(exerciseId) {
+    const input = setInputs[exerciseId] || emptySetInput();
+    const reps = input.reps.trim() ? parseInt(input.reps, 10) : null;
+    if (!reps) return;
+    const weight = input.weight.trim() ? parseFloat(input.weight) : null;
+
+    await logSet(exerciseId, { weight, reps, rpe: null });
+    setSetInputs((prev) => ({ ...prev, [exerciseId]: emptySetInput() }));
     await reload();
   }
 
@@ -81,14 +120,59 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
           {exercises.length === 0 ? (
             <Text style={styles.mutedText}>No exercises logged for this day yet.</Text>
           ) : (
-            exercises.map((exercise) => (
-              <View key={exercise.id} style={styles.exerciseRow}>
-                <Text style={styles.exerciseText}>{'⠿ ' + exercise.name}</Text>
-                <Pressable hitSlop={8} onPress={() => handleRemoveExercise(exercise.id)}>
-                  <Text style={styles.removeText}>✕</Text>
-                </Pressable>
-              </View>
-            ))
+            exercises.map((exercise) => {
+              const isExpanded = expandedIds.has(exercise.id);
+              const input = setInputs[exercise.id] || emptySetInput();
+
+              return (
+                <View key={exercise.id} style={styles.exerciseCard}>
+                  <View style={styles.exerciseRow}>
+                    <Pressable
+                      onPress={() => toggleExpanded(exercise.id)}
+                      style={styles.exerciseNameArea}
+                    >
+                      <Text style={styles.exerciseText}>{'⠿ ' + exercise.name}</Text>
+                    </Pressable>
+                    <Pressable hitSlop={8} onPress={() => handleRemoveExercise(exercise.id)}>
+                      <Text style={styles.removeText}>✕</Text>
+                    </Pressable>
+                  </View>
+
+                  {isExpanded && (
+                    <View style={styles.setPanel}>
+                      {exercise.sets.map((set, index) => (
+                        <Text key={set.id} style={styles.setText}>
+                          Set {index + 1}: {set.weight != null ? `${set.weight} kg` : '—'} ×{' '}
+                          {set.reps != null ? `${set.reps} reps` : '—'}
+                        </Text>
+                      ))}
+
+                      <View style={styles.setInputRow}>
+                        <TextInput
+                          keyboardType="decimal-pad"
+                          onChangeText={(text) => updateSetInput(exercise.id, 'weight', text)}
+                          placeholder="Weight (kg)"
+                          placeholderTextColor="#6A6A6A"
+                          style={styles.setInput}
+                          value={input.weight}
+                        />
+                        <TextInput
+                          keyboardType="number-pad"
+                          onChangeText={(text) => updateSetInput(exercise.id, 'reps', text)}
+                          placeholder="Reps"
+                          placeholderTextColor="#6A6A6A"
+                          style={styles.setInput}
+                          value={input.reps}
+                        />
+                        <Pressable onPress={() => handleLogSet(exercise.id)} style={styles.logButton}>
+                          <Text style={styles.logButtonText}>Log</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              );
+            })
           )}
         </View>
 
@@ -185,15 +269,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
+  exerciseCard: {
+    backgroundColor: '#1F1F1F',
+    borderRadius: 12,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+
   exerciseRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1F1F1F',
-    borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    marginBottom: 8,
+  },
+
+  exerciseNameArea: {
+    flex: 1,
   },
 
   exerciseText: {
@@ -206,6 +298,47 @@ const styles = StyleSheet.create({
   removeText: {
     fontSize: 13,
     color: '#8A8A8A',
+  },
+
+  setPanel: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
+
+  setText: {
+    fontSize: 12,
+    color: '#D0D0D0',
+    marginBottom: 4,
+  },
+
+  setInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+
+  setInput: {
+    flex: 1,
+    backgroundColor: '#161616',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#F5F5F5',
+  },
+
+  logButton: {
+    backgroundColor: '#CFFF3D',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+
+  logButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0A0A0A',
   },
 
   primaryButton: {
