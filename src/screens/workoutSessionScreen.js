@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   addExercises,
   copyPreviousWorkout,
@@ -43,9 +43,18 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
     await reload();
   }
 
-  async function handleRemoveExercise(id) {
-    await removeExercise(id);
-    await reload();
+  function handleRemoveExercise(id, name) {
+    Alert.alert('Delete this exercise?', `"${name}" and its logged sets will be removed.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await removeExercise(id);
+          await reload();
+        },
+      },
+    ]);
   }
 
   async function handleCopyPrevious() {
@@ -133,7 +142,7 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
                     >
                       <Text style={styles.exerciseText}>{'⠿ ' + exercise.name}</Text>
                     </Pressable>
-                    <Pressable hitSlop={8} onPress={() => handleRemoveExercise(exercise.id)}>
+                    <Pressable hitSlop={8} onPress={() => handleRemoveExercise(exercise.id, exercise.name)}>
                       <Image source={require('../../assets/icons/trash.png')} style={styles.removeIcon} />
                     </Pressable>
                   </View>
