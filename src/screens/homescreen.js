@@ -160,7 +160,7 @@ function NavTabButton({ tab, isActive, onPress }) {
     Animated.sequence([
       Animated.timing(scale, {
         toValue: 0.85,
-        duration: 80,
+        duration: 10,
         useNativeDriver: true,
       }),
       Animated.spring(scale, {
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
   },
 
   workoutCount: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: '#CFFF3D',
   },
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   weekdayText: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 11,
+    fontSize: 14,
     color: '#8A8A8A',
   },
 
@@ -479,9 +479,9 @@ const styles = StyleSheet.create({
   },
 
   dayPip: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 42,
+    height: 42,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#3A3A3A',
@@ -489,6 +489,7 @@ const styles = StyleSheet.create({
 
   dayPipDone: {
     backgroundColor: '#CFFF3D',
+    boxShadow: '0px 0px 6px #CFFF3D',
   },
 
   dayPipFuture: {
@@ -508,7 +509,7 @@ const styles = StyleSheet.create({
   },
 
   dayText: {
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '700',
   },
 
@@ -518,6 +519,7 @@ const styles = StyleSheet.create({
 
   dayTextFuture: {
     color: '#8A8A8A',
+    fontWeight: '400',
   },
 
   dayTextRest: {
