@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   addExercises,
   copyPreviousWorkout,
@@ -134,7 +134,7 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
                       <Text style={styles.exerciseText}>{'⠿ ' + exercise.name}</Text>
                     </Pressable>
                     <Pressable hitSlop={8} onPress={() => handleRemoveExercise(exercise.id)}>
-                      <Text style={styles.removeText}>✕</Text>
+                      <Image source={require('../../assets/icons/trash.png')} style={styles.removeIcon} />
                     </Pressable>
                   </View>
 
@@ -295,9 +295,10 @@ const styles = StyleSheet.create({
     color: '#F5F5F5',
   },
 
-  removeText: {
-    fontSize: 13,
-    color: '#8A8A8A',
+  removeIcon: {
+    width: 16,
+    height: 16,
+    resizeMode: 'contain',
   },
 
   setPanel: {
