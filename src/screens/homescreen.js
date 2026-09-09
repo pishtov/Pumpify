@@ -479,8 +479,8 @@ const styles = StyleSheet.create({
   },
 
   dayPip: {
-    width: 42,
-    height: 42,
+    width: 40,
+    height: 40,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
