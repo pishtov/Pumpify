@@ -1,5 +1,15 @@
-import { useEffect, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  Animated,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import {
   addExercises,
   copyPreviousWorkout,
@@ -11,8 +21,84 @@ import {
 import { formatDateHeading, shiftDateStr, todayDateStr } from '../utils/date';
 import ExercisePickerModal from './exercisePickerModal';
 
-function emptySetInput() {
-  return { weight: '', reps: '' };
+const PANEL_MAX_HEIGHT = 600;
+
+function ExerciseRow({ exercise, onLogSet, onRemove }) {
+  const [expanded, setExpanded] = useState(false);
+  const [weight, setWeight] = useState('');
+  const [reps, setReps] = useState('');
+  const anim = useRef(new Animated.Value(0)).current;
+
+  function toggleExpanded() {
+    const next = !expanded;
+    setExpanded(next);
+    Animated.timing(anim, {
+      duration: 220,
+      toValue: next ? 1 : 0,
+      useNativeDriver: false,
+    }).start();
+  }
+
+  function handleLogSet() {
+    const parsedReps = reps.trim() ? parseInt(reps, 10) : null;
+    if (!parsedReps) return;
+    const parsedWeight = weight.trim() ? parseFloat(weight) : null;
+    onLogSet(exercise.id, { weight: parsedWeight, reps: parsedReps });
+    setWeight('');
+    setReps('');
+  }
+
+  return (
+    <View style={styles.exerciseCard}>
+      <View style={styles.exerciseRow}>
+        <Pressable onPress={toggleExpanded} style={styles.exerciseNameArea}>
+          <Text style={styles.exerciseText}>{'⠿ ' + exercise.name}</Text>
+        </Pressable>
+        <Pressable hitSlop={8} onPress={() => onRemove(exercise.id, exercise.name)}>
+          <Image source={require('../../assets/icons/trash.png')} style={styles.removeIcon} />
+        </Pressable>
+      </View>
+
+      <Animated.View
+        style={{
+          maxHeight: anim.interpolate({ inputRange: [0, 1], outputRange: [0, PANEL_MAX_HEIGHT] }),
+          opacity: anim,
+          overflow: 'hidden',
+        }}
+      >
+        <View style={styles.setPanel}>
+          {exercise.sets.map((set, index) => (
+            <Text key={set.id} style={styles.setText}>
+              Set {index + 1}: {set.weight != null ? `${set.weight} kg` : '—'} ×{' '}
+              {set.reps != null ? `${set.reps} reps` : '—'}
+            </Text>
+          ))}
+
+          <View style={styles.setInputRow}>
+            <TextInput
+              keyboardType="decimal-pad"
+              onChangeText={setWeight}
+              placeholder="Weight (kg)"
+              placeholderTextColor="#6A6A6A"
+              style={styles.setInput}
+              value={weight}
+            />
+            <TextInput
+              keyboardType="number-pad"
+              onChangeText={setReps}
+              placeholder="Reps"
+              placeholderTextColor="#6A6A6A"
+              style={styles.setInput}
+              value={reps}
+            />
+            <Pressable onPress={handleLogSet} style={styles.logButton}>
+              <Text style={styles.logButtonText}>Log</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Animated.View>
+    </View>
+  );
 }
 
 // date is a 'YYYY-MM-DD' string for the day currently being viewed.
@@ -22,13 +108,9 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
   const [exercises, setExercises] = useState([]);
   const [previousDate, setPreviousDate] = useState(null);
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [expandedIds, setExpandedIds] = useState(new Set());
-  const [setInputs, setSetInputs] = useState({});
 
   useEffect(() => {
     setPickerVisible(false);
-    setExpandedIds(new Set());
-    setSetInputs({});
     reload();
     getPreviousSessionDate(date).then(setPreviousDate);
   }, [date]);
@@ -62,33 +144,8 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
     await reload();
   }
 
-  function toggleExpanded(exerciseId) {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(exerciseId)) {
-        next.delete(exerciseId);
-      } else {
-        next.add(exerciseId);
-      }
-      return next;
-    });
-  }
-
-  function updateSetInput(exerciseId, field, text) {
-    setSetInputs((prev) => ({
-      ...prev,
-      [exerciseId]: { ...(prev[exerciseId] || emptySetInput()), [field]: text },
-    }));
-  }
-
-  async function handleLogSet(exerciseId) {
-    const input = setInputs[exerciseId] || emptySetInput();
-    const reps = input.reps.trim() ? parseInt(input.reps, 10) : null;
-    if (!reps) return;
-    const weight = input.weight.trim() ? parseFloat(input.weight) : null;
-
+  async function handleLogSet(exerciseId, { weight, reps }) {
     await logSet(exerciseId, { weight, reps, rpe: null });
-    setSetInputs((prev) => ({ ...prev, [exerciseId]: emptySetInput() }));
     await reload();
   }
 
@@ -129,59 +186,14 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
           {exercises.length === 0 ? (
             <Text style={styles.mutedText}>No exercises logged for this day yet.</Text>
           ) : (
-            exercises.map((exercise) => {
-              const isExpanded = expandedIds.has(exercise.id);
-              const input = setInputs[exercise.id] || emptySetInput();
-
-              return (
-                <View key={exercise.id} style={styles.exerciseCard}>
-                  <View style={styles.exerciseRow}>
-                    <Pressable
-                      onPress={() => toggleExpanded(exercise.id)}
-                      style={styles.exerciseNameArea}
-                    >
-                      <Text style={styles.exerciseText}>{'⠿ ' + exercise.name}</Text>
-                    </Pressable>
-                    <Pressable hitSlop={8} onPress={() => handleRemoveExercise(exercise.id, exercise.name)}>
-                      <Image source={require('../../assets/icons/trash.png')} style={styles.removeIcon} />
-                    </Pressable>
-                  </View>
-
-                  {isExpanded && (
-                    <View style={styles.setPanel}>
-                      {exercise.sets.map((set, index) => (
-                        <Text key={set.id} style={styles.setText}>
-                          Set {index + 1}: {set.weight != null ? `${set.weight} kg` : '—'} ×{' '}
-                          {set.reps != null ? `${set.reps} reps` : '—'}
-                        </Text>
-                      ))}
-
-                      <View style={styles.setInputRow}>
-                        <TextInput
-                          keyboardType="decimal-pad"
-                          onChangeText={(text) => updateSetInput(exercise.id, 'weight', text)}
-                          placeholder="Weight (kg)"
-                          placeholderTextColor="#6A6A6A"
-                          style={styles.setInput}
-                          value={input.weight}
-                        />
-                        <TextInput
-                          keyboardType="number-pad"
-                          onChangeText={(text) => updateSetInput(exercise.id, 'reps', text)}
-                          placeholder="Reps"
-                          placeholderTextColor="#6A6A6A"
-                          style={styles.setInput}
-                          value={input.reps}
-                        />
-                        <Pressable onPress={() => handleLogSet(exercise.id)} style={styles.logButton}>
-                          <Text style={styles.logButtonText}>Log</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  )}
-                </View>
-              );
-            })
+            exercises.map((exercise) => (
+              <ExerciseRow
+                exercise={exercise}
+                key={exercise.id}
+                onLogSet={handleLogSet}
+                onRemove={handleRemoveExercise}
+              />
+            ))
           )}
         </View>
 
@@ -275,7 +287,6 @@ const styles = StyleSheet.create({
   mutedText: {
     fontSize: 13,
     color: '#8A8A8A',
-    marginBottom: 12,
   },
 
   exerciseCard: {
