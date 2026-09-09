@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
   },
 
   setText: {
-    fontSize: 12,
+    fontSize: 18,
     color: '#D0D0D0',
     marginBottom: 4,
   },
@@ -322,9 +322,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#161616',
     borderRadius: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    fontSize: 13,
+    fontSize: 18,
     color: '#F5F5F5',
   },
 
