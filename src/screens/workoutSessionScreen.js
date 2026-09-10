@@ -13,17 +13,84 @@ import {
 import {
   addExercises,
   copyPreviousWorkout,
+  deleteSet,
   getExercisesWithSets,
   getPreviousSessionDate,
   logSet,
   removeExercise,
+  updateSet,
 } from '../db/db';
 import { formatDateHeading, shiftDateStr, todayDateStr } from '../utils/date';
 import ExercisePickerModal from './exercisePickerModal';
 
 const PANEL_MAX_HEIGHT = 600;
 
-function ExerciseRow({ exercise, onLogSet, onRemove }) {
+function SetRow({ index, onDelete, onSave, set }) {
+  const [editing, setEditing] = useState(false);
+  const [weight, setWeight] = useState('');
+  const [reps, setReps] = useState('');
+
+  function startEditing() {
+    setWeight(set.weight != null ? String(set.weight) : '');
+    setReps(set.reps != null ? String(set.reps) : '');
+    setEditing(true);
+  }
+
+  function handleSave() {
+    const parsedReps = reps.trim() ? parseInt(reps, 10) : null;
+    if (!parsedReps) return;
+    const parsedWeight = weight.trim() ? parseFloat(weight) : null;
+    onSave(set.id, { weight: parsedWeight, reps: parsedReps });
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <View style={styles.setEditRow}>
+        <Text style={styles.setIndexText}>Set {index + 1}</Text>
+        <TextInput
+          autoFocus
+          keyboardType="decimal-pad"
+          onChangeText={setWeight}
+          placeholder="kg"
+          placeholderTextColor="#6A6A6A"
+          style={styles.setEditInput}
+          value={weight}
+        />
+        <TextInput
+          keyboardType="number-pad"
+          onChangeText={setReps}
+          placeholder="reps"
+          placeholderTextColor="#6A6A6A"
+          style={styles.setEditInput}
+          value={reps}
+        />
+        <Pressable hitSlop={8} onPress={handleSave}>
+          <Text style={styles.saveSetText}>✓</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.setRow}>
+      <Text style={styles.setText}>
+        Set {index + 1}: {set.weight != null ? `${set.weight} kg` : '—'} ×{' '}
+        {set.reps != null ? `${set.reps} reps` : '—'}
+      </Text>
+      <View style={styles.setActions}>
+        <Pressable hitSlop={8} onPress={startEditing}>
+          <Image source={require('../../assets/icons/pencil.png')} style={styles.setActionIcon} />
+        </Pressable>
+        <Pressable hitSlop={8} onPress={() => onDelete(set.id, index)}>
+          <Image source={require('../../assets/icons/trash.png')} style={styles.setActionIcon} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function ExerciseRow({ exercise, onDeleteSet, onLogSet, onRemove, onUpdateSet }) {
   const [expanded, setExpanded] = useState(false);
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
@@ -48,6 +115,13 @@ function ExerciseRow({ exercise, onLogSet, onRemove }) {
     setReps('');
   }
 
+  function handleDeleteSet(setId, index) {
+    Alert.alert('Delete this set?', `Set ${index + 1} will be removed.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => onDeleteSet(setId) },
+    ]);
+  }
+
   return (
     <View style={styles.exerciseCard}>
       <View style={styles.exerciseRow}>
@@ -68,10 +142,13 @@ function ExerciseRow({ exercise, onLogSet, onRemove }) {
       >
         <View style={styles.setPanel}>
           {exercise.sets.map((set, index) => (
-            <Text key={set.id} style={styles.setText}>
-              Set {index + 1}: {set.weight != null ? `${set.weight} kg` : '—'} ×{' '}
-              {set.reps != null ? `${set.reps} reps` : '—'}
-            </Text>
+            <SetRow
+              index={index}
+              key={set.id}
+              onDelete={handleDeleteSet}
+              onSave={onUpdateSet}
+              set={set}
+            />
           ))}
 
           <View style={styles.setInputRow}>
@@ -149,6 +226,16 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
     await reload();
   }
 
+  async function handleUpdateSet(setId, { weight, reps }) {
+    await updateSet(setId, { weight, reps });
+    await reload();
+  }
+
+  async function handleDeleteSet(setId) {
+    await deleteSet(setId);
+    await reload();
+  }
+
   const nextDate = shiftDateStr(date, 1);
   const canGoNext = nextDate <= todayDateStr();
 
@@ -182,7 +269,7 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.card}>
+        <View>
           {exercises.length === 0 ? (
             <Text style={styles.mutedText}>No exercises logged for this day yet.</Text>
           ) : (
@@ -190,8 +277,10 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
               <ExerciseRow
                 exercise={exercise}
                 key={exercise.id}
+                onDeleteSet={handleDeleteSet}
                 onLogSet={handleLogSet}
                 onRemove={handleRemoveExercise}
+                onUpdateSet={handleUpdateSet}
               />
             ))
           )}
@@ -278,12 +367,6 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
 
-  card: {
-    backgroundColor: '#161616',
-    borderRadius: 24,
-    padding: 16,
-  },
-
   mutedText: {
     fontSize: 13,
     color: '#8A8A8A',
@@ -326,10 +409,59 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
 
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+
   setText: {
     fontSize: 16,
     color: '#D0D0D0',
+    flex: 1,
+  },
+
+  setActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  setActionIcon: {
+    width: 14,
+    height: 14,
+    resizeMode: 'contain',
+  },
+
+  setEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginBottom: 4,
+  },
+
+  setIndexText: {
+    fontSize: 13,
+    color: '#8A8A8A',
+    width: 44,
+  },
+
+  setEditInput: {
+    flex: 1,
+    backgroundColor: '#161616',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 16,
+    color: '#F5F5F5',
+  },
+
+  saveSetText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#CFFF3D',
+    paddingHorizontal: 4,
   },
 
   setInputRow: {

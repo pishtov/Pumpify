@@ -110,6 +110,21 @@ export async function logSet(sessionExerciseId, { weight, reps, rpe }) {
   );
 }
 
+// values is { weight, reps } — corrects a set logged with the wrong numbers.
+export async function updateSet(setId, { weight, reps }) {
+  const db = await getDb();
+  await db.runAsync(`UPDATE exercise_sets SET weight = ?, reps = ? WHERE id = ?`, [
+    weight,
+    reps,
+    setId,
+  ]);
+}
+
+export async function deleteSet(setId) {
+  const db = await getDb();
+  await db.runAsync(`DELETE FROM exercise_sets WHERE id = ?`, [setId]);
+}
+
 // names is an array of exercise names (from the picker's catalog checks
 // and/or custom entries), appended in order after whatever's already logged.
 export async function addExercises(date, names) {
