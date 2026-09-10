@@ -64,7 +64,14 @@ function SetRow({ index, onDelete, onSave, set }) {
         </Text>
         <View style={styles.setActions}>
           <Pressable hitSlop={8} onPress={toggleEditing}>
-            <Image source={require('../../assets/icons/pencil.png')} style={styles.setActionIcon} />
+            <Image
+              source={
+                editing
+                  ? require('../../assets/icons/pencil_on.png')
+                  : require('../../assets/icons/pencil_off.png')
+              }
+              style={styles.setActionIcon}
+            />
           </Pressable>
           <Pressable hitSlop={8} onPress={() => onDelete(set.id, index)}>
             <Image source={require('../../assets/icons/trash.png')} style={styles.setActionIcon} />
