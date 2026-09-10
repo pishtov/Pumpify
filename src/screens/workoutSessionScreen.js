@@ -25,15 +25,26 @@ import ExercisePickerModal from './exercisePickerModal';
 
 const PANEL_MAX_HEIGHT = 600;
 
+const SET_EDIT_MAX_HEIGHT = 120;
+
 function SetRow({ index, onDelete, onSave, set }) {
   const [editing, setEditing] = useState(false);
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
+  const anim = useRef(new Animated.Value(0)).current;
 
-  function startEditing() {
-    setWeight(set.weight != null ? String(set.weight) : '');
-    setReps(set.reps != null ? String(set.reps) : '');
-    setEditing(true);
+  function toggleEditing() {
+    const next = !editing;
+    if (next) {
+      setWeight(set.weight != null ? String(set.weight) : '');
+      setReps(set.reps != null ? String(set.reps) : '');
+    }
+    setEditing(next);
+    Animated.timing(anim, {
+      duration: 200,
+      toValue: next ? 1 : 0,
+      useNativeDriver: false,
+    }).start();
   }
 
   function handleSave() {
@@ -41,51 +52,62 @@ function SetRow({ index, onDelete, onSave, set }) {
     if (!parsedReps) return;
     const parsedWeight = weight.trim() ? parseFloat(weight) : null;
     onSave(set.id, { weight: parsedWeight, reps: parsedReps });
-    setEditing(false);
-  }
-
-  if (editing) {
-    return (
-      <View style={styles.setEditRow}>
-        <Text style={styles.setIndexText}>Set {index + 1}</Text>
-        <TextInput
-          autoFocus
-          keyboardType="decimal-pad"
-          onChangeText={setWeight}
-          placeholder="kg"
-          placeholderTextColor="#6A6A6A"
-          style={styles.setEditInput}
-          value={weight}
-        />
-        <TextInput
-          keyboardType="number-pad"
-          onChangeText={setReps}
-          placeholder="reps"
-          placeholderTextColor="#6A6A6A"
-          style={styles.setEditInput}
-          value={reps}
-        />
-        <Pressable hitSlop={8} onPress={handleSave}>
-          <Text style={styles.saveSetText}>✓</Text>
-        </Pressable>
-      </View>
-    );
+    toggleEditing();
   }
 
   return (
-    <View style={styles.setRow}>
-      <Text style={styles.setText}>
-        Set {index + 1}: {set.weight != null ? `${set.weight} kg` : '—'} ×{' '}
-        {set.reps != null ? `${set.reps} reps` : '—'}
-      </Text>
-      <View style={styles.setActions}>
-        <Pressable hitSlop={8} onPress={startEditing}>
-          <Image source={require('../../assets/icons/pencil.png')} style={styles.setActionIcon} />
-        </Pressable>
-        <Pressable hitSlop={8} onPress={() => onDelete(set.id, index)}>
-          <Image source={require('../../assets/icons/trash.png')} style={styles.setActionIcon} />
-        </Pressable>
+    <View style={styles.setBlock}>
+      <View style={styles.setRow}>
+        <Text style={styles.setText}>
+          Set {index + 1}: {set.weight != null ? `${set.weight} kg` : '—'} ×{' '}
+          {set.reps != null ? `${set.reps} reps` : '—'}
+        </Text>
+        <View style={styles.setActions}>
+          <Pressable hitSlop={8} onPress={toggleEditing}>
+            <Image source={require('../../assets/icons/pencil.png')} style={styles.setActionIcon} />
+          </Pressable>
+          <Pressable hitSlop={8} onPress={() => onDelete(set.id, index)}>
+            <Image source={require('../../assets/icons/trash.png')} style={styles.setActionIcon} />
+          </Pressable>
+        </View>
       </View>
+
+      <Animated.View
+        style={{
+          maxHeight: anim.interpolate({ inputRange: [0, 1], outputRange: [0, SET_EDIT_MAX_HEIGHT] }),
+          opacity: anim,
+          overflow: 'hidden',
+        }}
+      >
+        <View style={styles.setEditPanel}>
+          <View style={styles.setEditInputRow}>
+            <TextInput
+              keyboardType="decimal-pad"
+              onChangeText={setWeight}
+              placeholder="Weight (kg)"
+              placeholderTextColor="#6A6A6A"
+              style={styles.setEditInput}
+              value={weight}
+            />
+            <TextInput
+              keyboardType="number-pad"
+              onChangeText={setReps}
+              placeholder="Reps"
+              placeholderTextColor="#6A6A6A"
+              style={styles.setEditInput}
+              value={reps}
+            />
+          </View>
+          <View style={styles.setEditActionsRow}>
+            <Pressable onPress={toggleEditing} style={styles.setCancelButton}>
+              <Text style={styles.setCancelButtonText}>Cancel</Text>
+            </Pressable>
+            <Pressable onPress={handleSave} style={styles.setSaveButton}>
+              <Text style={styles.setSaveButtonText}>Save</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Animated.View>
     </View>
   );
 }
@@ -271,7 +293,7 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View>
           {exercises.length === 0 ? (
-            <Text style={styles.mutedText}>No exercises logged for this day yet.</Text>
+            <Text style={styles.mutedText}>Add your first exercise to begin your workout.</Text>
           ) : (
             exercises.map((exercise) => (
               <ExerciseRow
@@ -287,7 +309,7 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
         </View>
 
         <Pressable onPress={() => setPickerVisible(true)} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>+ Add Exercise</Text>
+          <Text style={styles.primaryButtonText}>Add Exercise</Text>
         </Pressable>
 
         {previousDate && (
@@ -369,7 +391,11 @@ const styles = StyleSheet.create({
 
   mutedText: {
     fontSize: 13,
-    color: '#8A8A8A',
+    color: '#FFFFFF',
+    flex: 1,
+    textAlign: 'center',
+    fontWeight: '900',
+    fontSize: 16,
   },
 
   exerciseCard: {
@@ -409,11 +435,15 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
 
+  setBlock: {
+    marginBottom: 4,
+  },
+
   setRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    paddingVertical: 4,
   },
 
   setText: {
@@ -429,39 +459,65 @@ const styles = StyleSheet.create({
   },
 
   setActionIcon: {
-    width: 14,
-    height: 14,
+    width: 18,
+    height: 18,
     resizeMode: 'contain',
   },
 
-  setEditRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+  setEditPanel: {
+    backgroundColor: '#161616',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 4,
   },
 
-  setIndexText: {
-    fontSize: 13,
-    color: '#8A8A8A',
-    width: 44,
+  setEditInputRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 8,
   },
 
   setEditInput: {
     flex: 1,
-    backgroundColor: '#161616',
+    backgroundColor: '#0A0A0A',
     borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    fontSize: 16,
+    paddingVertical: 8,
+    fontSize: 14,
     color: '#F5F5F5',
   },
 
-  saveSetText: {
-    fontSize: 16,
+  setEditActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  setCancelButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#242424',
+  },
+
+  setCancelButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#F5F5F5',
+  },
+
+  setSaveButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#CFFF3D',
+  },
+
+  setSaveButtonText: {
+    fontSize: 13,
     fontWeight: '700',
-    color: '#CFFF3D',
-    paddingHorizontal: 4,
+    color: '#0A0A0A',
   },
 
   setInputRow: {
