@@ -163,6 +163,7 @@ function ExerciseRow({ exercise, onDeleteSet, onLogSet, onRemove, onUpdateSet })
         }}
       >
         <View style={styles.setPanel}>
+          <View style={styles.setPanelDivider} />
           {exercise.sets.map((set, index) => (
             <SetRow
               index={index}
@@ -433,6 +434,12 @@ const styles = StyleSheet.create({
   setPanel: {
     paddingHorizontal: 14,
     paddingBottom: 18,
+  },
+
+  setPanelDivider: {
+    height: 2,
+    backgroundColor: '#474747',
+    marginBottom: 10,
   },
 
   setBlock: {
