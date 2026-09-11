@@ -56,11 +56,11 @@ function SetRow({ index, onDelete, onSave, set }) {
   }
 
   return (
-    <View style={styles.setBlock}>
-      <View style={styles.setRow}>
+    <View style={styles.setCard}>
+      <Text style={styles.setIndexLabel}>Set {index + 1}:</Text>
+      <View style={styles.setDetailRow}>
         <Text style={styles.setText}>
-          Set {index + 1}: {set.weight != null ? `${set.weight} kg` : '—'} ×{' '}
-          {set.reps != null ? `${set.reps} reps` : '—'}
+          {set.weight != null ? `${set.weight} kg` : '—'} x {set.reps != null ? `${set.reps} reps` : '—'}
         </Text>
         <View style={styles.setActions}>
           <Pressable hitSlop={8} onPress={toggleEditing}>
@@ -449,27 +449,37 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  setBlock: {
-    marginBottom: 4,
+  setCard: {
+    backgroundColor: '#161616',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+    boxShadow: '0px 0px 6px #D2FF00',
   },
 
-  setRow: {
+  setIndexLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#8A8A8A',
+    marginBottom: 6,
+  },
+
+  setDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 4,
   },
 
   setText: {
-    fontSize: 16,
+    fontSize: 26,
+    fontWeight: '700',
     color: '#D0D0D0',
-    flex: 1,
   },
 
   setActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
 
   setActionIcon: {
@@ -479,10 +489,10 @@ const styles = StyleSheet.create({
   },
 
   setEditPanel: {
-    backgroundColor: '#161616',
+    backgroundColor: '#0A0A0A',
     borderRadius: 10,
     padding: 10,
-    marginTop: 4,
+    marginTop: 10,
   },
 
   setEditInputRow: {
@@ -493,7 +503,7 @@ const styles = StyleSheet.create({
 
   setEditInput: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: '#1F1F1F',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
