@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#161616',
     borderRadius: 10,
     padding: 10,
-    marginBottom: 8,
+    marginBottom: 16,
     boxShadow: '0px 0px 6px #D2FF00',
   },
 

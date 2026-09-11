@@ -188,7 +188,11 @@ function NavTabButton({ tab, isActive, onPress }) {
         ]}
       >
         <Animated.View style={[styles.navItemBackground, { opacity: bgOpacity }]} />
-        <Image source={isActive ? tab.iconOn : tab.iconOff} style={styles.navIcon} />
+        <Image
+          fadeDuration={0}
+          source={isActive ? tab.iconOn : tab.iconOff}
+          style={styles.navIcon}
+        />
         <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
           {tab.label}
         </Text>
