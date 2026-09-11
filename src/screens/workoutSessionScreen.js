@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
   setPanelDivider: {
     height: 2,
     backgroundColor: '#474747',
-    marginBottom: 10,
+    marginBottom: 20,
   },
 
   setCard: {
