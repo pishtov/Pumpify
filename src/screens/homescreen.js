@@ -137,19 +137,20 @@ function Calendar({ onSelectDay }) {
 }
 
 const BODY_PART_COLORS = [
-  { label: 'Legs', color: '#FF6B6B' },
-  { label: 'Chest', color: '#4D96FF' },
-  { label: 'Back', color: '#9D4EDD' },
-  { label: 'Shoulders', color: '#FFA500' },
-  { label: 'Arms', color: '#2EC4B6' },
-  { label: 'Core', color: '#FFD23F' },
-  { label: 'Cardio', color: '#FF3CAC' },
+  { label: 'Legs', color: '#fd182b' },
+  { label: 'Chest', color: '#1D4ED8' },
+  { label: 'Back', color: '#16A34A' },
+  { label: 'Shoulders', color: '#7E22CE' },
+  { label: 'Arms', color: '#ffd000' },
+  { label: 'Core', color: '#78350F' },
+  { label: 'Cardio', color: '#64748B' },
 ];
 
 function BodyPartLegend() {
   return (
     <View style={styles.card}>
       <Text style={styles.legendTitle}>Body Part Key</Text>
+      <View style={styles.setPanelDivider} />
       <View style={styles.legendGrid}>
         {BODY_PART_COLORS.map(({ label, color }) => (
           <View key={label} style={styles.legendItem}>
@@ -410,23 +411,29 @@ const styles = StyleSheet.create({
   },
 
   legendTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#CFFF3D',
     marginBottom: 12,
   },
 
+  setPanelDivider: {
+    height: 2,
+    backgroundColor: '#4747475d',
+    marginBottom: 14,
+  },
+
   legendGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
   },
 
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    minWidth: '30%',
+    minWidth: '20%',
   },
 
   legendDot: {
