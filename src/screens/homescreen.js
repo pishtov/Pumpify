@@ -136,6 +136,32 @@ function Calendar({ onSelectDay }) {
   );
 }
 
+const BODY_PART_COLORS = [
+  { label: 'Legs', color: '#FF6B6B' },
+  { label: 'Chest', color: '#4D96FF' },
+  { label: 'Back', color: '#9D4EDD' },
+  { label: 'Shoulders', color: '#FFA500' },
+  { label: 'Arms', color: '#2EC4B6' },
+  { label: 'Core', color: '#FFD23F' },
+  { label: 'Cardio', color: '#FF3CAC' },
+];
+
+function BodyPartLegend() {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.legendTitle}>Body Part Key</Text>
+      <View style={styles.legendGrid}>
+        {BODY_PART_COLORS.map(({ label, color }) => (
+          <View key={label} style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: color }]} />
+            <Text style={styles.legendLabel}>{label}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function NavTabButton({ tab, isActive, onPress }) {
   const scale = useRef(new Animated.Value(1)).current;
   const bgOpacity = useRef(new Animated.Value(isActive ? 1 : 0)).current;
@@ -322,7 +348,12 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {activeTab === 'Home' && <Calendar onSelectDay={setViewingDate} />}
+        {activeTab === 'Home' && (
+          <>
+            <Calendar onSelectDay={setViewingDate} />
+            <BodyPartLegend />
+          </>
+        )}
         {activeTab === 'Profile' && <ProfileScreen />}
         {(activeTab === 'Workouts' || activeTab === 'Progress') && (
           <PlaceholderScreen label={activeTab} />
@@ -375,6 +406,39 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 16,
+    gap: 16,
+  },
+
+  legendTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#CFFF3D',
+    marginBottom: 12,
+  },
+
+  legendGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: '30%',
+  },
+
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+
+  legendLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#D0D0D0',
   },
 
   card: {
