@@ -437,13 +437,13 @@ const styles = StyleSheet.create({
   },
 
   legendDot: {
-    width: 10,
-    height: 10,
+    width: 12,
+    height: 12,
     borderRadius: 5,
   },
 
   legendLabel: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
     color: '#D0D0D0',
   },
