@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import AnimatedButton from '../components/AnimatedButton';
 import {
   addExercises,
   copyPreviousWorkout,
@@ -316,9 +317,9 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
           )}
         </View>
 
-        <Pressable onPress={() => setPickerVisible(true)} style={styles.primaryButton}>
+        <AnimatedButton onPress={() => setPickerVisible(true)} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>Add Exercise</Text>
-        </Pressable>
+        </AnimatedButton>
 
         {previousDate && (
           <Pressable onPress={handleCopyPrevious} style={styles.secondaryButton}>
