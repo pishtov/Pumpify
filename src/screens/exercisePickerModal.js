@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { EXERCISE_CATEGORIES } from '../data/exercises';
 
 const FILTERS = ['All', ...EXERCISE_CATEGORIES.map((category) => category.name)];
@@ -55,9 +55,13 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
     .filter((category) => category.exercises.length > 0);
 
   const selectedCount = checked.size;
+  const sections = visibleCategories.map((category) => ({
+    title: category.name,
+    data: category.exercises,
+  }));
 
   return (
-    <Modal animationType="fade" onRequestClose={handleClose} transparent visible={visible}>
+    <Modal animationType="none" onRequestClose={handleClose} transparent visible={visible}>
       <View style={styles.overlay}>
         <View style={styles.card}>
           <View style={styles.header}>
@@ -97,32 +101,33 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
             })}
           </View>
 
-          <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-            {visibleCategories.length === 0 ? (
+          <SectionList
+            ListEmptyComponent={
               <Text style={styles.mutedText}>No exercises match "{search}".</Text>
-            ) : (
-              visibleCategories.map((category) => (
-                <View key={category.name} style={styles.categoryBlock}>
-                  {activeFilter === 'All' && (
-                    <Text style={styles.categoryTitle}>{category.name}</Text>
-                  )}
-                  {category.exercises.map((name) => {
-                    const isChecked = checked.has(name);
-                    return (
-                      <Pressable
-                        key={name}
-                        onPress={() => toggleExercise(name)}
-                        style={[styles.exerciseRow, isChecked && styles.exerciseRowChecked]}
-                      >
-                        <Text style={styles.exerciseText}>{'+ ' + name}</Text>
-                        <Text style={styles.checkmark}>{isChecked ? '✓' : ''}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ))
-            )}
-          </ScrollView>
+            }
+            initialNumToRender={16}
+            keyExtractor={(name) => name}
+            renderItem={({ item: name }) => {
+              const isChecked = checked.has(name);
+              return (
+                <Pressable
+                  onPress={() => toggleExercise(name)}
+                  style={[styles.exerciseRow, isChecked && styles.exerciseRowChecked]}
+                >
+                  <Text style={styles.exerciseText}>{'+ ' + name}</Text>
+                  <Text style={styles.checkmark}>{isChecked ? '✓' : ''}</Text>
+                </Pressable>
+              );
+            }}
+            renderSectionHeader={({ section }) =>
+              activeFilter === 'All' ? (
+                <Text style={styles.categoryTitle}>{section.title}</Text>
+              ) : null
+            }
+            sections={sections}
+            showsVerticalScrollIndicator={false}
+            style={styles.list}
+          />
 
           <Pressable
             disabled={selectedCount === 0}
@@ -245,14 +250,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
 
-  categoryBlock: {
-    marginBottom: 18,
-  },
-
   categoryTitle: {
     fontSize: 13,
     fontWeight: '800',
     color: '#CFFF3D',
+    marginTop: 4,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,

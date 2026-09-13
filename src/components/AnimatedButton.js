@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Animated, Pressable, StyleSheet } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet } from 'react-native';
 
 const PRESS_SCALE = 0.96;
 const DARKEN_OPACITY = 0.18;
@@ -11,16 +11,19 @@ export default function AnimatedButton({ children, disabled, onPress, style, ...
   const scale = useRef(new Animated.Value(1)).current;
   const darken = useRef(new Animated.Value(0)).current;
 
-  function handlePressIn() {
+  function handlePressIn(event) {
+    onPress?.(event);
     Animated.parallel([
       Animated.timing(scale, {
         toValue: PRESS_SCALE,
-        duration: 90,
+        duration: 40,
+        easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }),
       Animated.timing(darken, {
         toValue: 1,
-        duration: 90,
+        duration: 40,
+        easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }),
     ]).start();
@@ -28,15 +31,16 @@ export default function AnimatedButton({ children, disabled, onPress, style, ...
 
   function handlePressOut() {
     Animated.parallel([
-      Animated.spring(scale, {
+      Animated.timing(scale, {
         toValue: 1,
-        friction: 6,
-        tension: 200,
+        duration: 80,
+        easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }),
       Animated.timing(darken, {
         toValue: 0,
-        duration: 150,
+        duration: 80,
+        easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }),
     ]).start();
@@ -45,7 +49,6 @@ export default function AnimatedButton({ children, disabled, onPress, style, ...
   return (
     <Pressable
       disabled={disabled}
-      onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       {...pressableProps}
