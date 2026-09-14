@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { EXERCISE_CATEGORIES } from '../data/exercises';
+import AnimatedButton from '../components/AnimatedButton';
 
 const FILTERS = ['All', ...EXERCISE_CATEGORIES.map((category) => category.name)];
 
@@ -71,9 +72,9 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
             </Pressable>
           </View>
 
-          <Pressable onPress={() => {}} style={styles.createButton}>
+          <AnimatedButton onPress={() => {}} style={styles.createButton}>
             <Text style={styles.createButtonText}>+ Create New Exercise</Text>
-          </Pressable>
+          </AnimatedButton>
 
           <TextInput
             onChangeText={(text) => setState((prev) => ({ ...prev, search: text }))}

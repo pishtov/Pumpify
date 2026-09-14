@@ -107,12 +107,12 @@ function SetRow({ index, onDelete, onSave, set }) {
             />
           </View>
           <View style={styles.setEditActionsRow}>
-            <Pressable onPress={toggleEditing} style={styles.setCancelButton}>
+            <AnimatedButton onPress={toggleEditing} style={styles.setCancelButton}>
               <Text style={styles.setCancelButtonText}>Cancel</Text>
-            </Pressable>
-            <Pressable onPress={handleSave} style={styles.setSaveButton}>
+            </AnimatedButton>
+            <AnimatedButton onPress={handleSave} style={styles.setSaveButton}>
               <Text style={styles.setSaveButtonText}>Save</Text>
-            </Pressable>
+            </AnimatedButton>
           </View>
         </View>
       </Animated.View>
@@ -199,9 +199,9 @@ function ExerciseRow({ exercise, onDeleteSet, onLogSet, onRemove, onUpdateSet })
               style={styles.setInput}
               value={reps}
             />
-            <Pressable onPress={handleLogSet} style={styles.logButton}>
+            <AnimatedButton onPress={handleLogSet} style={styles.logButton}>
               <Text style={styles.logButtonText}>Log</Text>
-            </Pressable>
+            </AnimatedButton>
           </View>
         </View>
       </Animated.View>
