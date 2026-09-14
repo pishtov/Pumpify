@@ -51,6 +51,42 @@ def emulator_running():
     return result.returncode == 0 and "device" in result.stdout
 
 
+def kill_process_on_port(port):
+    """Kill any process already listening on the given TCP port.
+
+    Needed because terminating the expo_process on Ctrl+C only kills the
+    outer npx.cmd process on Windows, not the Metro/node process it spawns.
+    That leaves an orphaned server holding the port, so the next run either
+    fails to bind or silently shifts ports while the app keeps a stale
+    bundler URL cached.
+    """
+    try:
+        result = subprocess.run(
+            ["netstat", "-ano"],
+            capture_output=True,
+            text=True,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+    except FileNotFoundError:
+        return
+
+    pids = set()
+
+    for line in result.stdout.splitlines():
+        parts = line.split()
+
+        if len(parts) >= 5 and parts[0] == "TCP" and f":{port}" in parts[1] and parts[3] == "LISTENING":
+            pids.add(parts[-1])
+
+    for pid in pids:
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", pid],
+            capture_output=True,
+            text=True,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+
+
 def android_booted():
     result = run_adb(
         "shell",
@@ -217,6 +253,10 @@ def start_expo():
         CYAN
     )
 
+    # Clear out any orphaned Metro server left over from a previous
+    # session that wasn't fully killed (see kill_process_on_port).
+    kill_process_on_port(8081)
+
     print()
 
     print("-" * 64)
@@ -248,10 +288,21 @@ def start_expo():
             "start",
             "--dev-client"
         ],
-        cwd=PROJECT
+        cwd=PROJECT,
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
     )
 
     return expo_process
+
+
+def stop_expo(expo_process):
+    """Kill the full Expo/Metro process tree, not just npx.cmd itself."""
+    subprocess.run(
+        ["taskkill", "/F", "/T", "/PID", str(expo_process.pid)],
+        capture_output=True,
+        text=True,
+        creationflags=subprocess.CREATE_NO_WINDOW
+    )
 
 
 # ============================================================
@@ -392,7 +443,7 @@ def main():
             YELLOW
         )
 
-        expo_process.terminate()
+        stop_expo(expo_process)
 
     print()
     print("=" * 64)
