@@ -11,8 +11,7 @@ export default function AnimatedButton({ children, disabled, onPress, style, ...
   const scale = useRef(new Animated.Value(1)).current;
   const darken = useRef(new Animated.Value(0)).current;
 
-  function handlePressIn(event) {
-    onPress?.(event);
+  function handlePressIn() {
     Animated.parallel([
       Animated.timing(scale, {
         toValue: PRESS_SCALE,
@@ -49,6 +48,7 @@ export default function AnimatedButton({ children, disabled, onPress, style, ...
   return (
     <Pressable
       disabled={disabled}
+      onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       {...pressableProps}
