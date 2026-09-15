@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 const EXERCISE_TYPES = [
   {
@@ -20,12 +20,12 @@ const EXERCISE_TYPES = [
 ];
 
 function emptyState() {
-  return { selectedType: null };
+  return { selectedType: null, name: '' };
 }
 
 export default function CreateCustomExerciseModal({ visible, onClose }) {
   const [state, setState] = useState(emptyState);
-  const { selectedType } = state;
+  const { selectedType, name } = state;
 
   function reset() {
     setState(emptyState());
@@ -56,7 +56,7 @@ export default function CreateCustomExerciseModal({ visible, onClose }) {
               return (
                 <Pressable
                   key={type.key}
-                  onPress={() => setState({ selectedType: type.key })}
+                  onPress={() => setState((prev) => ({ ...prev, selectedType: type.key }))}
                   style={[styles.typeButton, isActive && styles.typeButtonActive]}
                 >
                   <Text style={[styles.typeButtonText, isActive && styles.typeButtonTextActive]}>
@@ -70,6 +70,15 @@ export default function CreateCustomExerciseModal({ visible, onClose }) {
           {activeType && (
             <Text style={styles.typeDescription}>{activeType.description}</Text>
           )}
+
+          <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>Exercise Name</Text>
+          <TextInput
+            onChangeText={(text) => setState((prev) => ({ ...prev, name: text }))}
+            placeholder="e.g. Bulgarian Split Squat"
+            placeholderTextColor="#6A6A6A"
+            style={styles.nameInput}
+            value={name}
+          />
         </View>
       </View>
     </Modal>
@@ -146,9 +155,25 @@ const styles = StyleSheet.create({
   },
 
   typeDescription: {
-    fontSize: 13,
-    color: '#8A8A8A',
+    fontSize: 12,
+    color: '#8a8a8aa1',
     lineHeight: 18,
     marginTop: 14,
+  },
+
+  sectionLabelSpaced: {
+    marginTop: 20,
+  },
+
+  nameInput: {
+    backgroundColor: '#1F1F1F',
+    borderRadius: 12,
+    paddingTop: 18,
+    paddingBottom: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    textAlign: 'center',
+    color: '#F5F5F5',
   },
 });
