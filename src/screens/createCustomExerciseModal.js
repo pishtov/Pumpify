@@ -5,17 +5,17 @@ const EXERCISE_TYPES = [
   {
     key: 'strength',
     label: 'Strength',
-    description: 'Logged like any other exercise, with sets and reps you can add and edit.',
+    description: 'Logged as weight lifted, with option to add reps and sets.',
   },
   {
     key: 'hold',
     label: 'Hold',
-    description: 'Logged as time held, with optional added weight - planks, dead hangs, wall sits.',
+    description: 'Logged as time held, with option to add weight.',
   },
   {
     key: 'cardio',
     label: 'Cardio',
-    description: 'Logged as distance (or floors, for stairmaster) covered in a time.',
+    description: 'Logged as distance (or floors) covered in a time.',
   },
 ];
 
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: '800',
     color: '#F5F5F5',
   },
@@ -109,10 +109,10 @@ const styles = StyleSheet.create({
   },
 
   sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '400',
     color: '#8A8A8A',
-    marginBottom: 8,
+    marginBottom: 12,
   },
 
   typeRow: {
