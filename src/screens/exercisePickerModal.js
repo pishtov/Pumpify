@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { EXERCISE_CATEGORIES } from '../data/exercises';
 import AnimatedButton from '../components/AnimatedButton';
+import CreateCustomExerciseModal from './createCustomExerciseModal';
 
 const FILTERS = ['All', ...EXERCISE_CATEGORIES.map((category) => category.name)];
 
@@ -12,6 +13,7 @@ function emptyState() {
 // onConfirm receives an array of checked exercise names.
 export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
   const [state, setState] = useState(emptyState);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
   const { checked, search, activeFilter } = state;
 
   function reset() {
@@ -72,7 +74,7 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
             </Pressable>
           </View>
 
-          <AnimatedButton onPress={() => {}} style={styles.createButton}>
+          <AnimatedButton onPress={() => setCreateModalVisible(true)} style={styles.createButton}>
             <Text style={styles.createButtonText}>+ Create New Exercise</Text>
           </AnimatedButton>
 
@@ -143,6 +145,11 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
           </Pressable>
         </View>
       </View>
+
+      <CreateCustomExerciseModal
+        onClose={() => setCreateModalVisible(false)}
+        visible={createModalVisible}
+      />
     </Modal>
   );
 }
