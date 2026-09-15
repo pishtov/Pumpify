@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { EXERCISE_CATEGORIES } from '../data/exercises';
-import { getCustomExercises } from '../db/db';
+import { deleteCustomExercise, getCustomExercises } from '../db/db';
 import AnimatedButton from '../components/AnimatedButton';
 import CreateCustomExerciseModal from './createCustomExerciseModal';
 
@@ -49,6 +49,31 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
     () => ['All', ...mergedCategories.map((category) => category.name)],
     [mergedCategories]
   );
+
+  const customExerciseNames = useMemo(
+    () => new Set(customExercises.map((exercise) => exercise.name)),
+    [customExercises]
+  );
+
+  function handleLongPressExercise(name) {
+    if (!customExerciseNames.has(name)) return;
+    Alert.alert('Delete Exercise', `Delete "${name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteCustomExercise(name);
+          setState((prev) => {
+            const next = new Set(prev.checked);
+            next.delete(name);
+            return { ...prev, checked: next };
+          });
+          loadCustomExercises();
+        },
+      },
+    ]);
+  }
 
   function reset() {
     setState(emptyState());
@@ -148,6 +173,7 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
               const isChecked = checked.has(name);
               return (
                 <Pressable
+                  onLongPress={() => handleLongPressExercise(name)}
                   onPress={() => toggleExercise(name)}
                   style={[styles.exerciseRow, isChecked && styles.exerciseRowChecked]}
                 >

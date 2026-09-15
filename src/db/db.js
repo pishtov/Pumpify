@@ -223,6 +223,11 @@ export async function addCustomExercise({ name, type, bodyPart }) {
   );
 }
 
+export async function deleteCustomExercise(name) {
+  const db = await getDb();
+  await db.runAsync(`DELETE FROM custom_exercises WHERE name = ?`, [name]);
+}
+
 // Returns every logged exercise, unfiltered — used by the export feature to
 // back up the full history, not just what the visible calendar range needs.
 export async function getAllSessionExercises() {
