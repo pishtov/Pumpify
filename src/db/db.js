@@ -50,6 +50,13 @@ export async function initDatabase() {
       logged_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_exercise_sets_session_exercise_id ON exercise_sets(session_exercise_id);
+    CREATE TABLE IF NOT EXISTS custom_exercises (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      type TEXT NOT NULL,
+      body_part TEXT,
+      created_at TEXT NOT NULL
+    );
   `);
 }
 
@@ -194,6 +201,26 @@ export async function copyPreviousWorkout(date) {
       order++;
     }
   });
+}
+
+// Returns every user-created exercise, so the picker can list them alongside
+// the built-in catalog.
+export async function getCustomExercises() {
+  const db = await getDb();
+  return db.getAllAsync(
+    `SELECT id, name, type, body_part FROM custom_exercises ORDER BY name`
+  );
+}
+
+// type is 'strength' | 'hold' | 'cardio'; bodyPart is required for strength
+// and hold, null for cardio. Throws if an exercise with this name already
+// exists (built-in names aren't checked here — the picker does that).
+export async function addCustomExercise({ name, type, bodyPart }) {
+  const db = await getDb();
+  await db.runAsync(
+    `INSERT INTO custom_exercises (name, type, body_part, created_at) VALUES (?, ?, ?, ?)`,
+    [name, type, bodyPart ?? null, new Date().toISOString()]
+  );
 }
 
 // Returns every logged exercise, unfiltered — used by the export feature to

@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { EXERCISE_CATEGORIES } from '../data/exercises';
+import { getCustomExercises } from '../db/db';
 import AnimatedButton from '../components/AnimatedButton';
 import CreateCustomExerciseModal from './createCustomExerciseModal';
-
-const FILTERS = ['All', ...EXERCISE_CATEGORIES.map((category) => category.name)];
 
 function emptyState() {
   return { checked: new Set(), search: '', activeFilter: 'All' };
@@ -14,7 +13,42 @@ function emptyState() {
 export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
   const [state, setState] = useState(emptyState);
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [customExercises, setCustomExercises] = useState([]);
   const { checked, search, activeFilter } = state;
+
+  const loadCustomExercises = useCallback(async () => {
+    setCustomExercises(await getCustomExercises());
+  }, []);
+
+  useEffect(() => {
+    if (visible) loadCustomExercises();
+  }, [visible, loadCustomExercises]);
+
+  // Built-in categories plus any user-created exercises, grouped in with the
+  // matching body part (or a "Cardio" category for cardio-type exercises).
+  const mergedCategories = useMemo(() => {
+    const categories = EXERCISE_CATEGORIES.map((category) => ({
+      name: category.name,
+      exercises: [...category.exercises],
+    }));
+    for (const custom of customExercises) {
+      const categoryName = custom.type === 'cardio' ? 'Cardio' : custom.body_part;
+      let category = categories.find((c) => c.name === categoryName);
+      if (!category) {
+        category = { name: categoryName, exercises: [] };
+        categories.push(category);
+      }
+      if (!category.exercises.includes(custom.name)) {
+        category.exercises.push(custom.name);
+      }
+    }
+    return categories;
+  }, [customExercises]);
+
+  const filters = useMemo(
+    () => ['All', ...mergedCategories.map((category) => category.name)],
+    [mergedCategories]
+  );
 
   function reset() {
     setState(emptyState());
@@ -44,8 +78,8 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
 
   const categoriesForFilter =
     activeFilter === 'All'
-      ? EXERCISE_CATEGORIES
-      : EXERCISE_CATEGORIES.filter((category) => category.name === activeFilter);
+      ? mergedCategories
+      : mergedCategories.filter((category) => category.name === activeFilter);
 
   const query = search.trim().toLowerCase();
   const visibleCategories = categoriesForFilter
@@ -88,7 +122,7 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
 
           <Text style={styles.filterLabel}>Filter by Body Part:</Text>
           <View style={styles.filterRow}>
-            {FILTERS.map((filter) => {
+            {filters.map((filter) => {
               const isActive = activeFilter === filter;
               return (
                 <Pressable
@@ -148,6 +182,7 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
 
       <CreateCustomExerciseModal
         onClose={() => setCreateModalVisible(false)}
+        onCreated={loadCustomExercises}
         visible={createModalVisible}
       />
     </Modal>

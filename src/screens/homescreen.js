@@ -4,6 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { getAllSessionExercises, getWorkoutDaysInRange, restoreSessionExercises } from '../db/db';
+import { BODY_PART_COLORS } from '../data/bodyParts';
 import { toDateStr } from '../utils/date';
 import WorkoutSessionScreen from './workoutSessionScreen';
 
@@ -135,16 +136,6 @@ function Calendar({ onSelectDay }) {
     </View>
   );
 }
-
-const BODY_PART_COLORS = [
-  { label: 'Legs', color: '#fd182b' },
-  { label: 'Chest', color: '#1D4ED8' },
-  { label: 'Back', color: '#16A34A' },
-  { label: 'Shoulders', color: '#7E22CE' },
-  { label: 'Arms', color: '#ffd000' },
-  { label: 'Core', color: '#78350F' },
-  { label: 'Cardio', color: '#64748B' },
-];
 
 function BodyPartLegend() {
   return (
