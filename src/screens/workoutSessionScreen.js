@@ -26,39 +26,60 @@ import ExercisePickerModal from './exercisePickerModal';
 
 const PANEL_MAX_HEIGHT = 600;
 
-const SET_EDIT_MAX_HEIGHT = 120;
+const SET_EDIT_MAX_HEIGHT = 150;
 
 const MAX_WEIGHT_KG = 3000;
 const MAX_REPS = 99;
 
 // Strips invalid characters and clamps to `max` as the user types, so a
 // runaway number of digits can never reach the UI (which breaks layout for
-// very large values) — used for the weight inputs (decimal allowed).
+// very large values) — used for the weight inputs (decimal allowed). Returns
+// whether this keystroke actually got clamped, so callers can warn the user.
 function clampDecimalText(text, max) {
   let cleaned = text.replace(/[^0-9.]/g, '');
   const firstDot = cleaned.indexOf('.');
   if (firstDot !== -1) {
     cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
   }
-  if (cleaned === '' || cleaned === '.') return cleaned;
+  if (cleaned === '' || cleaned === '.') return { text: cleaned, hitMax: false };
   const value = parseFloat(cleaned);
-  if (!Number.isNaN(value) && value > max) return String(max);
-  return cleaned;
+  if (!Number.isNaN(value) && value > max) return { text: String(max), hitMax: true };
+  return { text: cleaned, hitMax: false };
 }
 
 // Same idea as clampDecimalText, but integer-only — used for the reps inputs.
 function clampIntegerText(text, max) {
   const cleaned = text.replace(/[^0-9]/g, '');
-  if (cleaned === '') return cleaned;
+  if (cleaned === '') return { text: cleaned, hitMax: false };
   const value = parseInt(cleaned, 10);
-  if (value > max) return String(max);
-  return cleaned;
+  if (value > max) return { text: String(max), hitMax: true };
+  return { text: cleaned, hitMax: false };
+}
+
+const LIMIT_MESSAGE_DURATION = 1800;
+
+// Shows `message` under a set's input row for a couple seconds, so hitting a
+// cap gives feedback instead of just silently refusing more digits.
+function useLimitMessage() {
+  const [message, setMessage] = useState(null);
+  const timeoutRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(timeoutRef.current), []);
+
+  function show(text) {
+    setMessage(text);
+    clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setMessage(null), LIMIT_MESSAGE_DURATION);
+  }
+
+  return [message, show];
 }
 
 function SetRow({ index, onDelete, onSave, set }) {
   const [editing, setEditing] = useState(false);
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
+  const [limitMessage, showLimitMessage] = useLimitMessage();
   const anim = useRef(new Animated.Value(0)).current;
 
   function toggleEditing() {
@@ -119,7 +140,11 @@ function SetRow({ index, onDelete, onSave, set }) {
             <TextInput
               keyboardType="decimal-pad"
               maxLength={7}
-              onChangeText={(text) => setWeight(clampDecimalText(text, MAX_WEIGHT_KG))}
+              onChangeText={(text) => {
+                const result = clampDecimalText(text, MAX_WEIGHT_KG);
+                setWeight(result.text);
+                if (result.hitMax) showLimitMessage(`Max weight is ${MAX_WEIGHT_KG} kg`);
+              }}
               placeholder="Weight (kg)"
               placeholderTextColor="#6A6A6A"
               style={styles.setEditInput}
@@ -127,14 +152,19 @@ function SetRow({ index, onDelete, onSave, set }) {
             />
             <TextInput
               keyboardType="number-pad"
-              maxLength={2}
-              onChangeText={(text) => setReps(clampIntegerText(text, MAX_REPS))}
+              maxLength={3}
+              onChangeText={(text) => {
+                const result = clampIntegerText(text, MAX_REPS);
+                setReps(result.text);
+                if (result.hitMax) showLimitMessage(`Max reps is ${MAX_REPS}`);
+              }}
               placeholder="Reps"
               placeholderTextColor="#6A6A6A"
               style={styles.setEditInput}
               value={reps}
             />
           </View>
+          {limitMessage && <Text style={styles.limitMessageText}>{limitMessage}</Text>}
           <View style={styles.setEditActionsRow}>
             <AnimatedButton onPress={toggleEditing} style={styles.setCancelButton}>
               <Text style={styles.setCancelButtonText}>Cancel</Text>
@@ -153,6 +183,7 @@ function ExerciseRow({ exercise, onDeleteSet, onLogSet, onRemove, onUpdateSet })
   const [expanded, setExpanded] = useState(false);
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
+  const [limitMessage, showLimitMessage] = useLimitMessage();
   const anim = useRef(new Animated.Value(0)).current;
 
   function toggleExpanded() {
@@ -215,7 +246,11 @@ function ExerciseRow({ exercise, onDeleteSet, onLogSet, onRemove, onUpdateSet })
             <TextInput
               keyboardType="decimal-pad"
               maxLength={7}
-              onChangeText={(text) => setWeight(clampDecimalText(text, MAX_WEIGHT_KG))}
+              onChangeText={(text) => {
+                const result = clampDecimalText(text, MAX_WEIGHT_KG);
+                setWeight(result.text);
+                if (result.hitMax) showLimitMessage(`Max weight is ${MAX_WEIGHT_KG} kg`);
+              }}
               placeholder="Weight (kg)"
               placeholderTextColor="#6A6A6A"
               style={styles.setInput}
@@ -223,8 +258,12 @@ function ExerciseRow({ exercise, onDeleteSet, onLogSet, onRemove, onUpdateSet })
             />
             <TextInput
               keyboardType="number-pad"
-              maxLength={2}
-              onChangeText={(text) => setReps(clampIntegerText(text, MAX_REPS))}
+              maxLength={3}
+              onChangeText={(text) => {
+                const result = clampIntegerText(text, MAX_REPS);
+                setReps(result.text);
+                if (result.hitMax) showLimitMessage(`Max reps is ${MAX_REPS}`);
+              }}
               placeholder="Reps"
               placeholderTextColor="#6A6A6A"
               style={styles.setInput}
@@ -234,6 +273,7 @@ function ExerciseRow({ exercise, onDeleteSet, onLogSet, onRemove, onUpdateSet })
               <Text style={styles.logButtonText}>Log</Text>
             </AnimatedButton>
           </View>
+          {limitMessage && <Text style={styles.limitMessageText}>{limitMessage}</Text>}
         </View>
       </Animated.View>
     </View>
@@ -540,6 +580,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 14,
     color: '#F5F5F5',
+  },
+
+  limitMessageText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FF6B6B',
+    marginBottom: 8,
   },
 
   setEditActionsRow: {
