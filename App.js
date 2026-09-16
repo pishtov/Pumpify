@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import HomeScreen from './src/screens/homescreen';
 import { initDatabase } from './src/db/db';
 
@@ -18,10 +19,18 @@ export default function App() {
     );
   }
 
-  return <HomeScreen />;
+  return (
+    <GestureHandlerRootView style={styles.root}>
+      <HomeScreen />
+    </GestureHandlerRootView>
+  );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+
   loading: {
     flex: 1,
     backgroundColor: '#0A0A0A',

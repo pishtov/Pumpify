@@ -160,6 +160,20 @@ export async function removeExercise(exerciseId) {
   await db.runAsync(`DELETE FROM session_exercises WHERE id = ?`, [exerciseId]);
 }
 
+// orderedIds is every exercise id for a session, in the new display order —
+// what the session screen calls after a drag-to-reorder.
+export async function reorderExercises(orderedIds) {
+  const db = await getDb();
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await txn.runAsync(`UPDATE session_exercises SET exercise_order = ? WHERE id = ?`, [
+        i,
+        orderedIds[i],
+      ]);
+    }
+  });
+}
+
 // Most recent date before `beforeDate` that has any logged exercises, or
 // null if there isn't one — used to decide whether "Copy Previous Workout"
 // should be offered.

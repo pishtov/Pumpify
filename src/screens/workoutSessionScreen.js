@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -10,6 +10,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { scheduleOnRN } from 'react-native-worklets';
 import AnimatedButton from '../components/AnimatedButton';
 import {
   addExercises,
@@ -19,6 +21,7 @@ import {
   getPreviousSessionDate,
   logSet,
   removeExercise,
+  reorderExercises,
   updateSet,
 } from '../db/db';
 import { formatDateHeading, shiftDateStr, todayDateStr } from '../utils/date';
@@ -179,12 +182,46 @@ function SetRow({ index, onDelete, onSave, set }) {
   );
 }
 
-function ExerciseRow({ exercise, onDeleteSet, onLogSet, onRemove, onUpdateSet }) {
+function ExerciseRow({
+  dragStyle,
+  exercise,
+  isActive,
+  onDeleteSet,
+  onDragEnd,
+  onDragStart,
+  onDragUpdate,
+  onLogSet,
+  onMeasure,
+  onRemove,
+  onUpdateSet,
+}) {
   const [expanded, setExpanded] = useState(false);
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
   const [limitMessage, showLimitMessage] = useLimitMessage();
   const anim = useRef(new Animated.Value(0)).current;
+
+  const dragGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activateAfterLongPress(300)
+        .hitSlop(10)
+        .onStart(() => {
+          scheduleOnRN(onDragStart, exercise.id);
+        })
+        .onUpdate((event) => {
+          scheduleOnRN(onDragUpdate, exercise.id, event.translationY);
+        })
+        .onEnd(() => {
+          scheduleOnRN(onDragEnd);
+        }),
+    [exercise.id, onDragEnd, onDragStart, onDragUpdate]
+  );
+
+  function handleLayout(event) {
+    const { height, y } = event.nativeEvent.layout;
+    onMeasure(exercise.id, { height, y });
+  }
 
   function toggleExpanded() {
     const next = !expanded;
@@ -213,12 +250,20 @@ function ExerciseRow({ exercise, onDeleteSet, onLogSet, onRemove, onUpdateSet })
   }
 
   return (
-    <View style={styles.exerciseCard}>
+    <Animated.View
+      onLayout={handleLayout}
+      style={[styles.exerciseCard, isActive && styles.exerciseCardActive, dragStyle]}
+    >
       <View style={styles.exerciseRow}>
-        <Pressable onPress={toggleExpanded} style={styles.exerciseNameArea}>
-          <Text style={styles.exerciseText}>{'⠿ ' + exercise.name}</Text>
+        <GestureDetector gesture={dragGesture}>
+          <View style={styles.dragHandle}>
+            <Text style={styles.dragHandleIcon}>⠿</Text>
+          </View>
+        </GestureDetector>
+        <Pressable disabled={isActive} onPress={toggleExpanded} style={styles.exerciseNameArea}>
+          <Text style={styles.exerciseText}>{exercise.name}</Text>
         </Pressable>
-        <Pressable hitSlop={8} onPress={() => onRemove(exercise.id, exercise.name)}>
+        <Pressable disabled={isActive} hitSlop={8} onPress={() => onRemove(exercise.id, exercise.name)}>
           <Image source={require('../../assets/icons/trash.png')} style={styles.removeIcon} />
         </Pressable>
       </View>
@@ -276,7 +321,7 @@ function ExerciseRow({ exercise, onDeleteSet, onLogSet, onRemove, onUpdateSet })
           {limitMessage && <Text style={styles.limitMessageText}>{limitMessage}</Text>}
         </View>
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -287,6 +332,16 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
   const [exercises, setExercises] = useState([]);
   const [previousDate, setPreviousDate] = useState(null);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [draggingId, setDraggingId] = useState(null);
+
+  const exercisesRef = useRef(exercises);
+  const rowLayoutsRef = useRef({});
+  const dragStartYRef = useRef(0);
+  const dragTranslateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    exercisesRef.current = exercises;
+  }, [exercises]);
 
   useEffect(() => {
     setPickerVisible(false);
@@ -338,6 +393,56 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
     await reload();
   }
 
+  // Stable identities (empty deps, everything mutable read via refs) — these
+  // get passed into each row's useMemo-built Gesture, which must not be
+  // recreated mid-drag or the native gesture recognizer would be torn down.
+  const handleMeasureRow = useCallback((id, layout) => {
+    rowLayoutsRef.current[id] = layout;
+  }, []);
+
+  const handleDragStart = useCallback((id) => {
+    const layout = rowLayoutsRef.current[id];
+    dragStartYRef.current = layout ? layout.y : 0;
+    dragTranslateY.setValue(0);
+    setDraggingId(id);
+  }, []);
+
+  const handleDragUpdate = useCallback((id, translationY) => {
+    dragTranslateY.setValue(translationY);
+
+    const layout = rowLayoutsRef.current[id];
+    if (!layout) return;
+    const draggedCenter = dragStartYRef.current + layout.height / 2 + translationY;
+
+    let hoverId = null;
+    for (const exercise of exercisesRef.current) {
+      if (exercise.id === id) continue;
+      const rowLayout = rowLayoutsRef.current[exercise.id];
+      if (!rowLayout) continue;
+      if (draggedCenter >= rowLayout.y && draggedCenter < rowLayout.y + rowLayout.height) {
+        hoverId = exercise.id;
+        break;
+      }
+    }
+    if (hoverId == null) return;
+
+    setExercises((prev) => {
+      const fromIndex = prev.findIndex((exercise) => exercise.id === id);
+      const toIndex = prev.findIndex((exercise) => exercise.id === hoverId);
+      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
+  const handleDragEnd = useCallback(async () => {
+    setDraggingId(null);
+    dragTranslateY.setValue(0);
+    await reorderExercises(exercisesRef.current.map((exercise) => exercise.id));
+  }, []);
+
   const nextDate = shiftDateStr(date, 1);
   const canGoNext = nextDate <= todayDateStr();
 
@@ -371,16 +476,29 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View>
+        <View style={styles.exerciseListArea}>
           {exercises.length === 0 ? (
             <Text style={styles.mutedText}>Add your first exercise to begin your workout.</Text>
           ) : (
             exercises.map((exercise) => (
               <ExerciseRow
+                dragStyle={
+                  exercise.id === draggingId
+                    ? [
+                        styles.exerciseCardDragging,
+                        { top: dragStartYRef.current, transform: [{ translateY: dragTranslateY }] },
+                      ]
+                    : null
+                }
                 exercise={exercise}
+                isActive={exercise.id === draggingId}
                 key={exercise.id}
                 onDeleteSet={handleDeleteSet}
+                onDragEnd={handleDragEnd}
+                onDragStart={handleDragStart}
+                onDragUpdate={handleDragUpdate}
                 onLogSet={handleLogSet}
+                onMeasure={handleMeasureRow}
                 onRemove={handleRemoveExercise}
                 onUpdateSet={handleUpdateSet}
               />
@@ -469,6 +587,10 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
 
+  exerciseListArea: {
+    position: 'relative',
+  },
+
   mutedText: {
     fontSize: 13,
     color: '#FFFFFF',
@@ -485,12 +607,34 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
+  exerciseCardActive: {
+    backgroundColor: '#2A2A2A',
+    boxShadow: '0px 4px 12px #000000A0',
+  },
+
+  exerciseCardDragging: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    elevation: 10,
+  },
+
   exerciseRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 14,
+  },
+
+  dragHandle: {
+    paddingRight: 10,
+  },
+
+  dragHandleIcon: {
+    fontSize: 18,
+    color: '#6A6A6A',
   },
 
   exerciseNameArea: {
