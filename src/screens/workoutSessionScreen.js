@@ -28,6 +28,33 @@ const PANEL_MAX_HEIGHT = 600;
 
 const SET_EDIT_MAX_HEIGHT = 120;
 
+const MAX_WEIGHT_KG = 3000;
+const MAX_REPS = 99;
+
+// Strips invalid characters and clamps to `max` as the user types, so a
+// runaway number of digits can never reach the UI (which breaks layout for
+// very large values) — used for the weight inputs (decimal allowed).
+function clampDecimalText(text, max) {
+  let cleaned = text.replace(/[^0-9.]/g, '');
+  const firstDot = cleaned.indexOf('.');
+  if (firstDot !== -1) {
+    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+  }
+  if (cleaned === '' || cleaned === '.') return cleaned;
+  const value = parseFloat(cleaned);
+  if (!Number.isNaN(value) && value > max) return String(max);
+  return cleaned;
+}
+
+// Same idea as clampDecimalText, but integer-only — used for the reps inputs.
+function clampIntegerText(text, max) {
+  const cleaned = text.replace(/[^0-9]/g, '');
+  if (cleaned === '') return cleaned;
+  const value = parseInt(cleaned, 10);
+  if (value > max) return String(max);
+  return cleaned;
+}
+
 function SetRow({ index, onDelete, onSave, set }) {
   const [editing, setEditing] = useState(false);
   const [weight, setWeight] = useState('');
@@ -91,7 +118,8 @@ function SetRow({ index, onDelete, onSave, set }) {
           <View style={styles.setEditInputRow}>
             <TextInput
               keyboardType="decimal-pad"
-              onChangeText={setWeight}
+              maxLength={7}
+              onChangeText={(text) => setWeight(clampDecimalText(text, MAX_WEIGHT_KG))}
               placeholder="Weight (kg)"
               placeholderTextColor="#6A6A6A"
               style={styles.setEditInput}
@@ -99,7 +127,8 @@ function SetRow({ index, onDelete, onSave, set }) {
             />
             <TextInput
               keyboardType="number-pad"
-              onChangeText={setReps}
+              maxLength={2}
+              onChangeText={(text) => setReps(clampIntegerText(text, MAX_REPS))}
               placeholder="Reps"
               placeholderTextColor="#6A6A6A"
               style={styles.setEditInput}
@@ -185,7 +214,8 @@ function ExerciseRow({ exercise, onDeleteSet, onLogSet, onRemove, onUpdateSet })
           <View style={styles.setInputRow}>
             <TextInput
               keyboardType="decimal-pad"
-              onChangeText={setWeight}
+              maxLength={7}
+              onChangeText={(text) => setWeight(clampDecimalText(text, MAX_WEIGHT_KG))}
               placeholder="Weight (kg)"
               placeholderTextColor="#6A6A6A"
               style={styles.setInput}
@@ -193,7 +223,8 @@ function ExerciseRow({ exercise, onDeleteSet, onLogSet, onRemove, onUpdateSet })
             />
             <TextInput
               keyboardType="number-pad"
-              onChangeText={setReps}
+              maxLength={2}
+              onChangeText={(text) => setReps(clampIntegerText(text, MAX_REPS))}
               placeholder="Reps"
               placeholderTextColor="#6A6A6A"
               style={styles.setInput}
@@ -454,8 +485,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#161616',
     borderRadius: 10,
     padding: 10,
-    marginBottom: 16,
-    boxShadow: '0px 0px 6px #D2FF00',
+    marginBottom: 16, 
   },
 
   setIndexLabel: {
