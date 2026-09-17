@@ -7,7 +7,7 @@ export const EXERCISE_CATEGORIES = [
       'Barbell Bicep Curl',
       'Cable Preacher Curl',
       'Cable Rope Curl',
-      'Cable Trcieps Kickback',
+      'Cable Triceps Kickback',
       'Close Grip Push Up',
       'Concentration Curl',
       'Dumbbell Bicep Curl (Supinated)',
