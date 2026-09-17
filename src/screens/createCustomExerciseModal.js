@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { addCustomExercise } from '../db/db';
 import { BODY_PART_COLORS } from '../data/bodyParts';
 import AnimatedButton from '../components/AnimatedButton';
@@ -10,16 +10,22 @@ const EXERCISE_TYPES = [
     key: 'strength',
     label: 'Strength',
     description: 'Logged as weight lifted, with option to add reps and sets.',
+    iconOn: require('../../assets/icons/dumbbell_on.png'),
+    iconOff: require('../../assets/icons/dumbbell_off.png'),
   },
   {
     key: 'hold',
     label: 'Hold',
     description: 'Logged as time held, with option to add weight.',
+    iconOn: require('../../assets/icons/timer_on.png'),
+    iconOff: require('../../assets/icons/timer_off.png'),
   },
   {
     key: 'cardio',
     label: 'Cardio',
     description: 'Logged as distance (or floors) covered in a time.',
+    iconOn: require('../../assets/icons/energy_on.png'),
+    iconOff: require('../../assets/icons/energy_off.png'),
   },
 ];
 
@@ -98,6 +104,10 @@ export default function CreateCustomExerciseModal({ onClose, onCreated, visible 
                   onPress={() => selectType(type.key)}
                   style={[styles.typeButton, isActive && styles.typeButtonActive]}
                 >
+                  <Image
+                    source={isActive ? type.iconOn : type.iconOff}
+                    style={styles.typeButtonIcon}
+                  />
                   <Text style={[styles.typeButtonText, isActive && styles.typeButtonTextActive]}>
                     {type.label}
                   </Text>
@@ -213,12 +223,21 @@ const styles = StyleSheet.create({
 
   typeButton: {
     flex: 1,
+    flexDirection: 'row',
     backgroundColor: '#1F1F1F',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     borderWidth: 1,
     borderColor: 'transparent',
+  },
+
+  typeButtonIcon: {
+    width: 16,
+    height: 16,
+    resizeMode: 'contain',
   },
 
   typeButtonActive: {
