@@ -3,6 +3,7 @@ import { Alert, Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View
 import { EXERCISE_CATEGORIES } from '../data/exercises';
 import { deleteCustomExercise, getCustomExercises } from '../db/db';
 import AnimatedButton from '../components/AnimatedButton';
+import AnimatedIconButton from '../components/AnimatedIconButton';
 import CreateCustomExerciseModal from './createCustomExerciseModal';
 
 function emptyState() {
@@ -128,9 +129,9 @@ export default function ExercisePickerModal({ visible, onClose, onConfirm }) {
         <View style={styles.card}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Choose an Exercise</Text>
-            <Pressable accessibilityLabel="Close" hitSlop={10} onPress={handleClose}>
+            <AnimatedIconButton accessibilityLabel="Close" hitSlop={10} onPress={handleClose}>
               <Text style={styles.closeIcon}>✕</Text>
-            </Pressable>
+            </AnimatedIconButton>
           </View>
 
           <AnimatedButton onPress={() => setCreateModalVisible(true)} style={styles.createButton}>

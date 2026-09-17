@@ -13,6 +13,7 @@ import {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
 import AnimatedButton from '../components/AnimatedButton';
+import AnimatedIconButton from '../components/AnimatedIconButton';
 import {
   addExercises,
   copyPreviousWorkout,
@@ -449,30 +450,30 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Pressable accessibilityLabel="Back" hitSlop={10} onPress={onBack}>
+        <AnimatedIconButton accessibilityLabel="Back" hitSlop={10} onPress={onBack}>
           <Text style={styles.headerArrow}>‹</Text>
-        </Pressable>
+        </AnimatedIconButton>
         <Text style={styles.headerTitle}>Today's Workout</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <View style={styles.dateNavRow}>
-        <Pressable
+        <AnimatedIconButton
           accessibilityLabel="Previous day"
           hitSlop={10}
           onPress={() => onChangeDate(shiftDateStr(date, -1))}
         >
           <Text style={styles.dateNavArrow}>‹</Text>
-        </Pressable>
+        </AnimatedIconButton>
         <Text style={styles.dateLabel}>{formatDateHeading(date)}</Text>
-        <Pressable
+        <AnimatedIconButton
           accessibilityLabel="Next day"
           disabled={!canGoNext}
           hitSlop={10}
           onPress={() => onChangeDate(nextDate)}
         >
           <Text style={[styles.dateNavArrow, !canGoNext && styles.dateNavArrowDisabled]}>›</Text>
-        </Pressable>
+        </AnimatedIconButton>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>

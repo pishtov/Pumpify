@@ -5,6 +5,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { getAllSessionExercises, getWorkoutDaysInRange, restoreSessionExercises } from '../db/db';
 import { BODY_PART_COLORS } from '../data/bodyParts';
+import AnimatedIconButton from '../components/AnimatedIconButton';
 import { toDateStr } from '../utils/date';
 import WorkoutSessionScreen from './workoutSessionScreen';
 
@@ -78,13 +79,13 @@ function Calendar({ onSelectDay }) {
     <View style={styles.card}>
       <View style={styles.calendarHeaderRow}>
         <View style={styles.monthNavRow}>
-          <Pressable accessibilityLabel="Previous month" hitSlop={8} onPress={() => changeMonth(-1)}>
+          <AnimatedIconButton accessibilityLabel="Previous month" hitSlop={8} onPress={() => changeMonth(-1)}>
             <Text style={styles.monthNavArrow}>‹</Text>
-          </Pressable>
+          </AnimatedIconButton>
           <Text style={styles.monthTitle}>{MONTH_NAMES[viewMonth]} {viewYear}</Text>
-          <Pressable accessibilityLabel="Next month" hitSlop={8} onPress={() => changeMonth(1)}>
+          <AnimatedIconButton accessibilityLabel="Next month" hitSlop={8} onPress={() => changeMonth(1)}>
             <Text style={styles.monthNavArrow}>›</Text>
-          </Pressable>
+          </AnimatedIconButton>
         </View>
         <Text style={styles.workoutCount}>{workoutCount} WORKOUTS</Text>
       </View>

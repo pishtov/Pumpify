@@ -3,6 +3,7 @@ import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'reac
 import { addCustomExercise } from '../db/db';
 import { BODY_PART_COLORS } from '../data/bodyParts';
 import AnimatedButton from '../components/AnimatedButton';
+import AnimatedIconButton from '../components/AnimatedIconButton';
 
 const EXERCISE_TYPES = [
   {
@@ -82,9 +83,9 @@ export default function CreateCustomExerciseModal({ onClose, onCreated, visible 
         <View style={styles.card}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Create Custom Exercise</Text>
-            <Pressable accessibilityLabel="Close" hitSlop={10} onPress={handleClose}>
+            <AnimatedIconButton accessibilityLabel="Close" hitSlop={10} onPress={handleClose}>
               <Text style={styles.closeIcon}>✕</Text>
-            </Pressable>
+            </AnimatedIconButton>
           </View>
 
           <Text style={styles.sectionLabel}>Exercise Type</Text>
