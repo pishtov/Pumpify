@@ -105,6 +105,7 @@ export default function CreateCustomExerciseModal({ onClose, onCreated, visible 
                   style={[styles.typeButton, isActive && styles.typeButtonActive]}
                 >
                   <Image
+                    fadeDuration={0}
                     source={isActive ? type.iconOn : type.iconOff}
                     style={styles.typeButtonIcon}
                   />
