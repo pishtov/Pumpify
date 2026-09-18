@@ -58,6 +58,13 @@ export async function initDatabase() {
       created_at TEXT NOT NULL
     );
   `);
+
+  // metric was added after the table above shipped — add it for anyone
+  // upgrading from an older install where custom_exercises already exists.
+  const customExerciseColumns = await db.getAllAsync(`PRAGMA table_info(custom_exercises)`);
+  if (!customExerciseColumns.some((column) => column.name === 'metric')) {
+    await db.execAsync(`ALTER TABLE custom_exercises ADD COLUMN metric TEXT`);
+  }
 }
 
 // Returns an array of 'YYYY-MM-DD' strings for every date with at least one
@@ -222,18 +229,19 @@ export async function copyPreviousWorkout(date) {
 export async function getCustomExercises() {
   const db = await getDb();
   return db.getAllAsync(
-    `SELECT id, name, type, body_part FROM custom_exercises ORDER BY name`
+    `SELECT id, name, type, body_part, metric FROM custom_exercises ORDER BY name`
   );
 }
 
 // type is 'strength' | 'hold' | 'cardio'; bodyPart is required for strength
-// and hold, null for cardio. Throws if an exercise with this name already
-// exists (built-in names aren't checked here — the picker does that).
-export async function addCustomExercise({ name, type, bodyPart }) {
+// and hold, null for cardio. metric is 'distance' | 'floors' for cardio,
+// null otherwise. Throws if an exercise with this name already exists
+// (built-in names aren't checked here — the picker does that).
+export async function addCustomExercise({ name, type, bodyPart, metric }) {
   const db = await getDb();
   await db.runAsync(
-    `INSERT INTO custom_exercises (name, type, body_part, created_at) VALUES (?, ?, ?, ?)`,
-    [name, type, bodyPart ?? null, new Date().toISOString()]
+    `INSERT INTO custom_exercises (name, type, body_part, metric, created_at) VALUES (?, ?, ?, ?, ?)`,
+    [name, type, bodyPart ?? null, metric ?? null, new Date().toISOString()]
   );
 }
 

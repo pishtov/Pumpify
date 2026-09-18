@@ -33,14 +33,19 @@ const EXERCISE_TYPES = [
 // itself isn't offered as a body part choice for Strength/Hold exercises.
 const BODY_PARTS = BODY_PART_COLORS.filter(({ label }) => label !== 'Cardio');
 
+const CARDIO_METRICS = [
+  { key: 'distance', label: 'Distance (km/mi)' },
+  { key: 'floors', label: 'Floors' },
+];
+
 function emptyState() {
-  return { selectedType: null, name: '', bodyPart: null };
+  return { selectedType: null, name: '', bodyPart: null, metric: null };
 }
 
 export default function CreateCustomExerciseModal({ onClose, onCreated, visible }) {
   const [state, setState] = useState(emptyState);
   const [saving, setSaving] = useState(false);
-  const { selectedType, name, bodyPart } = state;
+  const { selectedType, name, bodyPart, metric } = state;
 
   function reset() {
     setState(emptyState());
@@ -52,12 +57,22 @@ export default function CreateCustomExerciseModal({ onClose, onCreated, visible 
   }
 
   function selectType(key) {
-    setState((prev) => ({ ...prev, selectedType: key, bodyPart: key === 'cardio' ? null : prev.bodyPart }));
+    setState((prev) => ({
+      ...prev,
+      selectedType: key,
+      bodyPart: key === 'cardio' ? null : prev.bodyPart,
+      metric: key === 'cardio' ? prev.metric : null,
+    }));
   }
 
   const activeType = EXERCISE_TYPES.find((type) => type.key === selectedType);
   const needsBodyPart = selectedType === 'strength' || selectedType === 'hold';
-  const canCreate = name.trim().length > 0 && selectedType != null && (!needsBodyPart || bodyPart != null);
+  const needsMetric = selectedType === 'cardio';
+  const canCreate =
+    name.trim().length > 0 &&
+    selectedType != null &&
+    (!needsBodyPart || bodyPart != null) &&
+    (!needsMetric || metric != null);
 
   async function handleCreate() {
     if (!canCreate || saving) return;
@@ -67,8 +82,14 @@ export default function CreateCustomExerciseModal({ onClose, onCreated, visible 
         name: name.trim(),
         type: selectedType,
         bodyPart: needsBodyPart ? bodyPart : null,
+        metric: needsMetric ? metric : null,
       });
-      onCreated?.({ name: name.trim(), type: selectedType, bodyPart: needsBodyPart ? bodyPart : null });
+      onCreated?.({
+        name: name.trim(),
+        type: selectedType,
+        bodyPart: needsBodyPart ? bodyPart : null,
+        metric: needsMetric ? metric : null,
+      });
       reset();
       onClose();
     } catch (error) {
@@ -148,6 +169,30 @@ export default function CreateCustomExerciseModal({ onClose, onCreated, visible 
                           styles.bodyPartButtonText,
                           isActive && styles.bodyPartButtonTextActive,
                         ]}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {needsMetric && (
+            <>
+              <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>Metric</Text>
+              <View style={styles.metricRow}>
+                {CARDIO_METRICS.map(({ key, label }) => {
+                  const isActive = metric === key;
+                  return (
+                    <Pressable
+                      key={key}
+                      onPress={() => setState((prev) => ({ ...prev, metric: key }))}
+                      style={[styles.metricButton, isActive && styles.metricButtonActive]}
+                    >
+                      <Text
+                        style={[styles.metricButtonText, isActive && styles.metricButtonTextActive]}
                       >
                         {label}
                       </Text>
@@ -315,6 +360,36 @@ const styles = StyleSheet.create({
   },
 
   bodyPartButtonTextActive: {
+    color: '#CFFF3D',
+  },
+
+  metricRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  metricButton: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#1F1F1F',
+    borderRadius: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+
+  metricButtonActive: {
+    backgroundColor: '#2A331A',
+    borderColor: '#CFFF3D',
+  },
+
+  metricButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#D0D0D0',
+  },
+
+  metricButtonTextActive: {
     color: '#CFFF3D',
   },
 
