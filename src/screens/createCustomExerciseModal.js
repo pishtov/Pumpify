@@ -10,8 +10,8 @@ const EXERCISE_TYPES = [
     key: 'strength',
     label: 'Strength',
     description: 'Logged as weight lifted, with option to add reps and sets.',
-    iconOn: require('../../assets/icons/checkmark_on.png'),
-    iconOff: require('../../assets/icons/checkmark_off.png'),
+    iconOn: require('../../assets/icons/biceps_on.png'),
+    iconOff: require('../../assets/icons/biceps_off.png'),
   },
   {
     key: 'hold',
