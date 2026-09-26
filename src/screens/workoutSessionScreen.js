@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -339,6 +339,7 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
   const [previousDate, setPreviousDate] = useState(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [draggingId, setDraggingId] = useState(null);
+  const [dropSlotHeight, setDropSlotHeight] = useState(0);
 
   const exercisesRef = useRef(exercises);
   const rowLayoutsRef = useRef({});
@@ -421,6 +422,7 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
   const handleDragStart = useCallback((id) => {
     const layout = rowLayoutsRef.current[id];
     dragStartYRef.current = layout ? layout.y : 0;
+    setDropSlotHeight(layout ? layout.height : 0);
     dragRef.current = { id, startScrollY: scrollYRef.current, translationY: 0 };
     dragTranslateY.setValue(0);
     setDraggingId(id);
@@ -445,22 +447,20 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
     if (!layout) return;
     const draggedCenter = dragStartYRef.current + layout.height / 2 + translationY;
 
-    let hoverId = null;
+    // The drop index is how many other rows have their midpoint above the
+    // dragged card's center. Midpoints (not row bounds) keep this stable when
+    // rows differ in height — e.g. an expanded row won't swap back and forth
+    // as the drop slot moves around it.
+    let toIndex = 0;
     for (const exercise of exercisesRef.current) {
       if (exercise.id === id) continue;
       const rowLayout = rowLayoutsRef.current[exercise.id];
-      if (!rowLayout) continue;
-      if (draggedCenter >= rowLayout.y && draggedCenter < rowLayout.y + rowLayout.height) {
-        hoverId = exercise.id;
-        break;
-      }
+      if (rowLayout && rowLayout.y + rowLayout.height / 2 < draggedCenter) toIndex++;
     }
-    if (hoverId == null) return;
 
     setExercises((prev) => {
       const fromIndex = prev.findIndex((exercise) => exercise.id === id);
-      const toIndex = prev.findIndex((exercise) => exercise.id === hoverId);
-      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return prev;
+      if (fromIndex === -1 || fromIndex === toIndex) return prev;
       const next = [...prev];
       const [moved] = next.splice(fromIndex, 1);
       next.splice(toIndex, 0, moved);
@@ -568,28 +568,37 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
           {exercises.length === 0 ? (
             <Text style={styles.mutedText}>Add your first exercise to begin your workout.</Text>
           ) : (
+            // Each row is wrapped in a Fragment that's always there, so the drop
+            // slot appearing beside the dragged row never remounts it — that
+            // would tear down its gesture mid-drag.
             exercises.map((exercise) => (
-              <ExerciseRow
-                dragStyle={
-                  exercise.id === draggingId
-                    ? [
-                        styles.exerciseCardDragging,
-                        { top: dragStartYRef.current, transform: [{ translateY: dragTranslateY }] },
-                      ]
-                    : null
-                }
-                exercise={exercise}
-                isActive={exercise.id === draggingId}
-                key={exercise.id}
-                onDeleteSet={handleDeleteSet}
-                onDragEnd={handleDragEnd}
-                onDragStart={handleDragStart}
-                onDragUpdate={handleDragUpdate}
-                onLogSet={handleLogSet}
-                onMeasure={handleMeasureRow}
-                onRemove={handleRemoveExercise}
-                onUpdateSet={handleUpdateSet}
-              />
+              <Fragment key={exercise.id}>
+                {/* The dragged card floats (absolute), so this slot holds its
+                    place in the list and shows where it lands on release. */}
+                {exercise.id === draggingId && (
+                  <View style={[styles.dropSlot, { height: dropSlotHeight }]} />
+                )}
+                <ExerciseRow
+                  dragStyle={
+                    exercise.id === draggingId
+                      ? [
+                          styles.exerciseCardDragging,
+                          { top: dragStartYRef.current, transform: [{ translateY: dragTranslateY }] },
+                        ]
+                      : null
+                  }
+                  exercise={exercise}
+                  isActive={exercise.id === draggingId}
+                  onDeleteSet={handleDeleteSet}
+                  onDragEnd={handleDragEnd}
+                  onDragStart={handleDragStart}
+                  onDragUpdate={handleDragUpdate}
+                  onLogSet={handleLogSet}
+                  onMeasure={handleMeasureRow}
+                  onRemove={handleRemoveExercise}
+                  onUpdateSet={handleUpdateSet}
+                />
+              </Fragment>
             ))
           )}
         </View>
@@ -698,6 +707,15 @@ const styles = StyleSheet.create({
   exerciseCardActive: {
     backgroundColor: '#2A2A2A',
     boxShadow: '0px 4px 12px #000000A0',
+  },
+
+  dropSlot: {
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#CFFF3D',
+    backgroundColor: '#CFFF3D14',
   },
 
   exerciseCardDragging: {
