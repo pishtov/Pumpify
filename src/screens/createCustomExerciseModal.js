@@ -68,8 +68,10 @@ export default function CreateCustomExerciseModal({ onClose, onCreated, visible 
   const activeType = EXERCISE_TYPES.find((type) => type.key === selectedType);
   const needsBodyPart = selectedType === 'strength' || selectedType === 'hold';
   const needsMetric = selectedType === 'cardio';
+  // Collapses stray spaces so "Biceps  Curl " matches "Biceps Curl".
+  const cleanName = name.trim().replace(/\s+/g, ' ');
   const canCreate =
-    name.trim().length > 0 &&
+    cleanName.length > 0 &&
     selectedType != null &&
     (!needsBodyPart || bodyPart != null) &&
     (!needsMetric || metric != null);
@@ -79,13 +81,13 @@ export default function CreateCustomExerciseModal({ onClose, onCreated, visible 
     setSaving(true);
     try {
       await addCustomExercise({
-        name: name.trim(),
+        name: cleanName,
         type: selectedType,
         bodyPart: needsBodyPart ? bodyPart : null,
         metric: needsMetric ? metric : null,
       });
       onCreated?.({
-        name: name.trim(),
+        name: cleanName,
         type: selectedType,
         bodyPart: needsBodyPart ? bodyPart : null,
         metric: needsMetric ? metric : null,

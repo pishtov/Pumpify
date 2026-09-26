@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { EXERCISE_CATEGORIES } from '../data/exercises';
 
 const DB_NAME = 'pumpify.db';
 
@@ -246,10 +247,26 @@ export async function getCustomExercises() {
 
 // type is 'strength' | 'hold' | 'cardio'; bodyPart is required for strength
 // and hold, null for cardio. metric is 'distance' | 'floors' for cardio,
-// null otherwise. Throws if an exercise with this name already exists
-// (built-in names aren't checked here — the picker does that).
+// null otherwise. Throws if a built-in or custom exercise already has this
+// name, ignoring case — "biceps curl" and "Biceps Curl" are the same exercise.
 export async function addCustomExercise({ name, type, bodyPart, metric }) {
+  const lowerName = name.toLowerCase();
+  const builtIn = EXERCISE_CATEGORIES.flatMap((category) => category.exercises).find(
+    (existing) => existing.toLowerCase() === lowerName
+  );
+  if (builtIn) {
+    throw new Error(`"${builtIn}" is already in the exercise list.`);
+  }
+
   const db = await getDb();
+  const custom = await db.getFirstAsync(
+    `SELECT name FROM custom_exercises WHERE name = ? COLLATE NOCASE`,
+    [name]
+  );
+  if (custom) {
+    throw new Error(`You already created "${custom.name}".`);
+  }
+
   await db.runAsync(
     `INSERT INTO custom_exercises (name, type, body_part, metric, created_at) VALUES (?, ?, ?, ?, ?)`,
     [name, type, bodyPart ?? null, metric ?? null, new Date().toISOString()]
