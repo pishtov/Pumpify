@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import {
   Alert,
   Animated,
+  Easing,
   Image,
   Pressable,
   ScrollView,
@@ -11,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Reanimated, { LinearTransition } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import AnimatedButton from '../components/AnimatedButton';
 import AnimatedIconButton from '../components/AnimatedIconButton';
@@ -34,6 +36,13 @@ const PANEL_MAX_HEIGHT = 600;
 // list's top/bottom edge scrolls the list, faster the closer to the edge.
 const AUTO_SCROLL_EDGE = 90;
 const AUTO_SCROLL_MAX_SPEED = 16; // px per frame
+
+// Rows glide out of the dragged card's way instead of snapping. Only applied
+// while a drag is active — otherwise expanding a row's set panel would make
+// every row below it lag behind the panel's own animation.
+const REORDER_TRANSITION = LinearTransition.duration(180);
+const DRAG_LIFT_SCALE = 1.03;
+const DROP_DURATION = 160;
 
 const SET_EDIT_MAX_HEIGHT = 150;
 
@@ -197,7 +206,6 @@ function ExerciseRow({
   onDragStart,
   onDragUpdate,
   onLogSet,
-  onMeasure,
   onRemove,
   onUpdateSet,
 }) {
@@ -223,11 +231,6 @@ function ExerciseRow({
         }),
     [exercise.id, onDragEnd, onDragStart, onDragUpdate]
   );
-
-  function handleLayout(event) {
-    const { height, y } = event.nativeEvent.layout;
-    onMeasure(exercise.id, { height, y });
-  }
 
   function toggleExpanded() {
     const next = !expanded;
@@ -257,7 +260,6 @@ function ExerciseRow({
 
   return (
     <Animated.View
-      onLayout={handleLayout}
       style={[styles.exerciseCard, isActive && styles.exerciseCardActive, dragStyle]}
     >
       <View style={styles.exerciseRow}>
@@ -344,7 +346,9 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
   const exercisesRef = useRef(exercises);
   const rowLayoutsRef = useRef({});
   const dragStartYRef = useRef(0);
+  const dropSlotYRef = useRef(0);
   const dragTranslateY = useRef(new Animated.Value(0)).current;
+  const dragScale = useRef(new Animated.Value(1)).current;
 
   // Auto-scroll state — all refs, since it's driven from a frame loop and the
   // stable drag callbacks below.
@@ -422,10 +426,18 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
   const handleDragStart = useCallback((id) => {
     const layout = rowLayoutsRef.current[id];
     dragStartYRef.current = layout ? layout.y : 0;
+    dropSlotYRef.current = dragStartYRef.current;
     setDropSlotHeight(layout ? layout.height : 0);
     dragRef.current = { id, startScrollY: scrollYRef.current, translationY: 0 };
+    dragTranslateY.stopAnimation();
     dragTranslateY.setValue(0);
     setDraggingId(id);
+    Animated.spring(dragScale, {
+      toValue: DRAG_LIFT_SCALE,
+      friction: 7,
+      tension: 160,
+      useNativeDriver: true,
+    }).start();
     // Measured per drag (not once) so it stays right if the header or
     // keyboard has shifted the list since the last drag.
     scrollViewRef.current?.measureInWindow((x, y, width, height) => {
@@ -514,8 +526,29 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
     autoScrollSpeedRef.current = 0;
     cancelAnimationFrame(autoScrollFrameRef.current);
     autoScrollFrameRef.current = null;
-    setDraggingId(null);
-    dragTranslateY.setValue(0);
+
+    // Glide the card into the drop slot before handing it back to the list,
+    // so it settles into place instead of teleporting there on release.
+    Animated.parallel([
+      Animated.timing(dragTranslateY, {
+        toValue: dropSlotYRef.current - dragStartYRef.current,
+        duration: DROP_DURATION,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(dragScale, {
+        toValue: 1,
+        duration: DROP_DURATION,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      // Interrupted by a new drag starting — that drag owns the state now.
+      if (!finished) return;
+      setDraggingId(null);
+      dragTranslateY.setValue(0);
+    });
+
     await reorderExercises(exercisesRef.current.map((exercise) => exercise.id));
   }, []);
 
@@ -568,38 +601,56 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
           {exercises.length === 0 ? (
             <Text style={styles.mutedText}>Add your first exercise to begin your workout.</Text>
           ) : (
-            // Each row is wrapped in a Fragment that's always there, so the drop
-            // slot appearing beside the dragged row never remounts it — that
-            // would tear down its gesture mid-drag.
-            exercises.map((exercise) => (
-              <Fragment key={exercise.id}>
-                {/* The dragged card floats (absolute), so this slot holds its
-                    place in the list and shows where it lands on release. */}
-                {exercise.id === draggingId && (
-                  <View style={[styles.dropSlot, { height: dropSlotHeight }]} />
-                )}
-                <ExerciseRow
-                  dragStyle={
-                    exercise.id === draggingId
-                      ? [
-                          styles.exerciseCardDragging,
-                          { top: dragStartYRef.current, transform: [{ translateY: dragTranslateY }] },
-                        ]
-                      : null
-                  }
-                  exercise={exercise}
-                  isActive={exercise.id === draggingId}
-                  onDeleteSet={handleDeleteSet}
-                  onDragEnd={handleDragEnd}
-                  onDragStart={handleDragStart}
-                  onDragUpdate={handleDragUpdate}
-                  onLogSet={handleLogSet}
-                  onMeasure={handleMeasureRow}
-                  onRemove={handleRemoveExercise}
-                  onUpdateSet={handleUpdateSet}
-                />
-              </Fragment>
-            ))
+            // Each row sits in a Fragment + wrapper that are always there, so the
+            // drop slot appearing and the row lifting out never remount the row —
+            // that would tear down its gesture mid-drag.
+            exercises.map((exercise) => {
+              const isDragged = exercise.id === draggingId;
+              return (
+                <Fragment key={exercise.id}>
+                  {/* The dragged card floats (absolute), so this slot holds its
+                      place in the list and shows where it lands on release. */}
+                  {isDragged && (
+                    <Reanimated.View
+                      layout={REORDER_TRANSITION}
+                      onLayout={(event) => {
+                        dropSlotYRef.current = event.nativeEvent.layout.y;
+                      }}
+                      style={[styles.dropSlot, { height: dropSlotHeight }]}
+                    />
+                  )}
+                  <Reanimated.View
+                    // The floating card follows the finger itself — a layout
+                    // transition on it would fight that.
+                    layout={draggingId != null && !isDragged ? REORDER_TRANSITION : undefined}
+                    // Measured here, not inside the row: this wrapper is what
+                    // sits in the list, so its y is the row's position.
+                    onLayout={(event) => {
+                      const { height, y } = event.nativeEvent.layout;
+                      handleMeasureRow(exercise.id, { height, y });
+                    }}
+                    style={isDragged ? [styles.exerciseCardDragging, { top: dragStartYRef.current }] : null}
+                  >
+                    <ExerciseRow
+                      dragStyle={
+                        isDragged
+                          ? { transform: [{ translateY: dragTranslateY }, { scale: dragScale }] }
+                          : null
+                      }
+                      exercise={exercise}
+                      isActive={isDragged}
+                      onDeleteSet={handleDeleteSet}
+                      onDragEnd={handleDragEnd}
+                      onDragStart={handleDragStart}
+                      onDragUpdate={handleDragUpdate}
+                      onLogSet={handleLogSet}
+                      onRemove={handleRemoveExercise}
+                      onUpdateSet={handleUpdateSet}
+                    />
+                  </Reanimated.View>
+                </Fragment>
+              );
+            })
           )}
         </View>
 
