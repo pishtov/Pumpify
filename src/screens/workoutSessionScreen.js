@@ -30,6 +30,11 @@ import ExercisePickerModal from './exercisePickerModal';
 
 const PANEL_MAX_HEIGHT = 600;
 
+// While dragging an exercise, holding the finger within this many px of the
+// list's top/bottom edge scrolls the list, faster the closer to the edge.
+const AUTO_SCROLL_EDGE = 90;
+const AUTO_SCROLL_MAX_SPEED = 16; // px per frame
+
 const SET_EDIT_MAX_HEIGHT = 150;
 
 const MAX_WEIGHT_KG = 3000;
@@ -211,7 +216,7 @@ function ExerciseRow({
           scheduleOnRN(onDragStart, exercise.id);
         })
         .onUpdate((event) => {
-          scheduleOnRN(onDragUpdate, exercise.id, event.translationY);
+          scheduleOnRN(onDragUpdate, exercise.id, event.translationY, event.absoluteY);
         })
         .onEnd(() => {
           scheduleOnRN(onDragEnd);
@@ -340,9 +345,21 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
   const dragStartYRef = useRef(0);
   const dragTranslateY = useRef(new Animated.Value(0)).current;
 
+  // Auto-scroll state — all refs, since it's driven from a frame loop and the
+  // stable drag callbacks below.
+  const scrollViewRef = useRef(null);
+  const scrollYRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const viewportRef = useRef({ top: 0, height: 0 });
+  const dragRef = useRef(null); // { id, startScrollY, translationY }
+  const autoScrollSpeedRef = useRef(0);
+  const autoScrollFrameRef = useRef(null);
+
   useEffect(() => {
     exercisesRef.current = exercises;
   }, [exercises]);
+
+  useEffect(() => () => cancelAnimationFrame(autoScrollFrameRef.current), []);
 
   useEffect(() => {
     setPickerVisible(false);
@@ -404,11 +421,24 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
   const handleDragStart = useCallback((id) => {
     const layout = rowLayoutsRef.current[id];
     dragStartYRef.current = layout ? layout.y : 0;
+    dragRef.current = { id, startScrollY: scrollYRef.current, translationY: 0 };
     dragTranslateY.setValue(0);
     setDraggingId(id);
+    // Measured per drag (not once) so it stays right if the header or
+    // keyboard has shifted the list since the last drag.
+    scrollViewRef.current?.measureInWindow((x, y, width, height) => {
+      viewportRef.current = { top: y, height };
+    });
   }, []);
 
-  const handleDragUpdate = useCallback((id, translationY) => {
+  // Moves the dragged card and swaps it past whichever row it's over. The
+  // card lives inside the scrolled content, so any scrolling since the drag
+  // began is added on top of the finger's movement to keep it under the finger.
+  const updateDragPosition = useCallback(() => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const { id } = drag;
+    const translationY = drag.translationY + (scrollYRef.current - drag.startScrollY);
     dragTranslateY.setValue(translationY);
 
     const layout = rowLayoutsRef.current[id];
@@ -438,7 +468,52 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
     });
   }, []);
 
+  // Runs once per frame while the finger is in an edge zone; stops itself
+  // once the speed drops to 0, the drag ends, or the list hits either end.
+  const autoScrollStep = useCallback(() => {
+    const speed = autoScrollSpeedRef.current;
+    const maxScrollY = Math.max(0, contentHeightRef.current - viewportRef.current.height);
+    const nextScrollY = Math.min(maxScrollY, Math.max(0, scrollYRef.current + speed));
+    if (!dragRef.current || speed === 0 || nextScrollY === scrollYRef.current) {
+      autoScrollFrameRef.current = null;
+      return;
+    }
+    // Set eagerly — onScroll reports back asynchronously, and the next frame
+    // needs the position this one just scrolled to.
+    scrollYRef.current = nextScrollY;
+    scrollViewRef.current?.scrollTo({ y: nextScrollY, animated: false });
+    updateDragPosition();
+    autoScrollFrameRef.current = requestAnimationFrame(autoScrollStep);
+  }, [updateDragPosition]);
+
+  const handleDragUpdate = useCallback(
+    (id, translationY, absoluteY) => {
+      if (!dragRef.current || dragRef.current.id !== id) return;
+      dragRef.current.translationY = translationY;
+      updateDragPosition();
+
+      const { top, height } = viewportRef.current;
+      const fromTop = absoluteY - top;
+      const fromBottom = top + height - absoluteY;
+      let speed = 0;
+      if (fromTop < AUTO_SCROLL_EDGE) {
+        speed = -AUTO_SCROLL_MAX_SPEED * Math.min(1, 1 - fromTop / AUTO_SCROLL_EDGE);
+      } else if (fromBottom < AUTO_SCROLL_EDGE) {
+        speed = AUTO_SCROLL_MAX_SPEED * Math.min(1, 1 - fromBottom / AUTO_SCROLL_EDGE);
+      }
+      autoScrollSpeedRef.current = speed;
+      if (speed !== 0 && autoScrollFrameRef.current == null) {
+        autoScrollFrameRef.current = requestAnimationFrame(autoScrollStep);
+      }
+    },
+    [autoScrollStep, updateDragPosition]
+  );
+
   const handleDragEnd = useCallback(async () => {
+    dragRef.current = null;
+    autoScrollSpeedRef.current = 0;
+    cancelAnimationFrame(autoScrollFrameRef.current);
+    autoScrollFrameRef.current = null;
     setDraggingId(null);
     dragTranslateY.setValue(0);
     await reorderExercises(exercisesRef.current.map((exercise) => exercise.id));
@@ -476,7 +551,19 @@ export default function WorkoutSessionScreen({ date, onBack, onChangeDate }) {
         </AnimatedIconButton>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        onContentSizeChange={(width, height) => {
+          contentHeightRef.current = height;
+        }}
+        onScroll={(event) => {
+          scrollYRef.current = event.nativeEvent.contentOffset.y;
+        }}
+        ref={scrollViewRef}
+        scrollEnabled={draggingId == null}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.exerciseListArea}>
           {exercises.length === 0 ? (
             <Text style={styles.mutedText}>Add your first exercise to begin your workout.</Text>
