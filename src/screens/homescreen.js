@@ -3,10 +3,26 @@ import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View }
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { getAllSessionExercises, getWorkoutDaysInRange, restoreSessionExercises } from '../db/db';
+import {
+  getAllSessionExercises,
+  getProfile,
+  getWorkoutDaysInRange,
+  restoreSessionExercises,
+  saveProfile,
+} from '../db/db';
 import { BODY_PART_COLORS } from '../data/bodyParts';
+import {
+  EXPERIENCE_OPTIONS,
+  GOAL_OPTIONS,
+  SEX_OPTIONS,
+  ageFromBirthYear,
+  bmi,
+  optionLabel,
+} from '../data/profile';
+import AnimatedButton from '../components/AnimatedButton';
 import AnimatedIconButton from '../components/AnimatedIconButton';
 import { toDateStr } from '../utils/date';
+import EditProfileModal from './editProfileModal';
 import WorkoutSessionScreen from './workoutSessionScreen';
 
 const MONTH_NAMES = [
@@ -252,12 +268,105 @@ function PlaceholderScreen({ label }) {
   );
 }
 
+// Rounds for display and drops trailing ".0" (80 → "80", 80.25 → "80.3").
+function formatNumber(value) {
+  return String(Math.round(value * 10) / 10);
+}
+
+function StatTile({ label, value, unit }) {
+  return (
+    <View style={styles.statTile}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statValue, value == null && styles.statValueEmpty]}>
+        {value ?? '—'}
+        {value != null && unit ? <Text style={styles.statUnit}> {unit}</Text> : null}
+      </Text>
+    </View>
+  );
+}
+
+function ProfileStatsCard({ profile, onEdit }) {
+  if (!profile) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.profileSectionTitle}>Your Profile</Text>
+        <Text style={styles.profileSectionSubtitle}>
+          Add your body stats and training goal. No account needed — it stays on this device
+          and is included in your data export.
+        </Text>
+        <AnimatedButton onPress={onEdit} style={styles.profileButton}>
+          <Text style={styles.profileButtonText}>Create profile</Text>
+        </AnimatedButton>
+      </View>
+    );
+  }
+
+  const age = ageFromBirthYear(profile.birth_year);
+  const bmiValue = bmi(profile.height_cm, profile.weight_kg);
+  const tags = [
+    optionLabel(SEX_OPTIONS, profile.sex),
+    optionLabel(GOAL_OPTIONS, profile.goal),
+    optionLabel(EXPERIENCE_OPTIONS, profile.experience),
+  ].filter(Boolean);
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.profileHeaderRow}>
+        <Text style={styles.profileName}>{profile.name || 'Your Profile'}</Text>
+        <AnimatedIconButton accessibilityLabel="Edit profile" hitSlop={10} onPress={onEdit}>
+          <Text style={styles.profileEditText}>Edit</Text>
+        </AnimatedIconButton>
+      </View>
+
+      {tags.length > 0 && (
+        <View style={styles.profileTagRow}>
+          {tags.map((tag) => (
+            <View key={tag} style={styles.profileTag}>
+              <Text style={styles.profileTagText}>{tag}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.statGrid}>
+        <StatTile label="Age" value={age} unit="yrs" />
+        <StatTile
+          label="Height"
+          value={profile.height_cm != null ? formatNumber(profile.height_cm) : null}
+          unit="cm"
+        />
+        <StatTile
+          label="Weight"
+          value={profile.weight_kg != null ? formatNumber(profile.weight_kg) : null}
+          unit="kg"
+        />
+        <StatTile label="BMI" value={bmiValue != null ? formatNumber(bmiValue) : null} />
+      </View>
+    </View>
+  );
+}
+
 function ProfileScreen() {
+  const [profile, setProfile] = useState(null);
+  const [editing, setEditing] = useState(false);
+
+  const loadProfile = useCallback(async () => {
+    setProfile(await getProfile());
+  }, []);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
   async function handleExport() {
     try {
       const rows = await getAllSessionExercises();
       const payload = JSON.stringify(
-        { exportedAt: new Date().toISOString(), sessionExercises: rows },
+        {
+          exportedAt: new Date().toISOString(),
+          profile: await getProfile(),
+          sessionExercises: rows,
+        },
         null,
         2
       );
@@ -292,6 +401,20 @@ function ProfileScreen() {
       }
 
       await restoreSessionExercises(data.sessionExercises);
+      // Backups made before profiles existed have no profile key — keep the
+      // current profile rather than wiping it.
+      if (data.profile) {
+        await saveProfile({
+          name: data.profile.name,
+          sex: data.profile.sex,
+          birthYear: data.profile.birth_year,
+          heightCm: data.profile.height_cm,
+          weightKg: data.profile.weight_kg,
+          goal: data.profile.goal,
+          experience: data.profile.experience,
+        });
+        await loadProfile();
+      }
       Alert.alert('Import complete', `Restored ${data.sessionExercises.length} logged exercises.`);
     } catch (error) {
       Alert.alert('Import failed', error.message);
@@ -299,23 +422,32 @@ function ProfileScreen() {
   }
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.profileSectionTitle}>Backup & Restore</Text>
-      <Text style={styles.profileSectionSubtitle}>
-        Your data is stored only on this device. Export it to keep a copy, or import a
-        previous backup.
-      </Text>
-
-      <Pressable onPress={handleExport} style={styles.profileButton}>
-        <Text style={styles.profileButtonText}>Export data</Text>
-      </Pressable>
-
-      <Pressable onPress={handleImport} style={[styles.profileButton, styles.profileButtonSecondary]}>
-        <Text style={[styles.profileButtonText, styles.profileButtonTextSecondary]}>
-          Import data
+    <>
+      <ProfileStatsCard onEdit={() => setEditing(true)} profile={profile} />
+      <EditProfileModal
+        onClose={() => setEditing(false)}
+        onSaved={loadProfile}
+        profile={profile}
+        visible={editing}
+      />
+      <View style={styles.card}>
+        <Text style={styles.profileSectionTitle}>Backup & Restore</Text>
+        <Text style={styles.profileSectionSubtitle}>
+          Your data is stored only on this device. Export it to keep a copy, or import a
+          previous backup.
         </Text>
-      </Pressable>
-    </View>
+
+        <Pressable onPress={handleExport} style={styles.profileButton}>
+          <Text style={styles.profileButtonText}>Export data</Text>
+        </Pressable>
+
+        <Pressable onPress={handleImport} style={[styles.profileButton, styles.profileButtonSecondary]}>
+          <Text style={[styles.profileButtonText, styles.profileButtonTextSecondary]}>
+            Import data
+          </Text>
+        </Pressable>
+      </View>
+    </>
   );
 }
 
@@ -488,6 +620,82 @@ const styles = StyleSheet.create({
 
   profileButtonTextSecondary: {
     color: '#F5F5F5',
+  },
+
+  profileHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+
+  profileName: {
+    flex: 1,
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#F5F5F5',
+  },
+
+  profileEditText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#CFFF3D',
+  },
+
+  profileTagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+
+  profileTag: {
+    backgroundColor: '#2A331A',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+
+  profileTagText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#CFFF3D',
+  },
+
+  statGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+
+  statTile: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    backgroundColor: '#1F1F1F',
+    borderRadius: 14,
+    padding: 14,
+  },
+
+  statLabel: {
+    fontSize: 12,
+    color: '#8A8A8A',
+    marginBottom: 4,
+  },
+
+  statValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#F5F5F5',
+  },
+
+  statValueEmpty: {
+    color: '#4A4A4A',
+  },
+
+  statUnit: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8A8A8A',
   },
 
   calendarHeaderRow: {

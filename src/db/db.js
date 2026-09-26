@@ -57,6 +57,17 @@ export async function initDatabase() {
       body_part TEXT,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS user_profile (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      name TEXT,
+      sex TEXT,
+      birth_year INTEGER,
+      height_cm REAL,
+      weight_kg REAL,
+      goal TEXT,
+      experience TEXT,
+      updated_at TEXT NOT NULL
+    );
   `);
 
   // metric was added after the table above shipped — add it for anyone
@@ -248,6 +259,37 @@ export async function addCustomExercise({ name, type, bodyPart, metric }) {
 export async function deleteCustomExercise(name) {
   const db = await getDb();
   await db.runAsync(`DELETE FROM custom_exercises WHERE name = ?`, [name]);
+}
+
+// The profile is a single row (id is pinned to 1) — returns null until the
+// user fills it in for the first time.
+export async function getProfile() {
+  const db = await getDb();
+  return db.getFirstAsync(
+    `SELECT name, sex, birth_year, height_cm, weight_kg, goal, experience, updated_at
+     FROM user_profile WHERE id = 1`
+  );
+}
+
+// Every field is optional — pass null for anything the user left blank.
+// Overwrites the whole profile, so callers should pass every field.
+export async function saveProfile({ name, sex, birthYear, heightCm, weightKg, goal, experience }) {
+  const db = await getDb();
+  await db.runAsync(
+    `INSERT OR REPLACE INTO user_profile
+       (id, name, sex, birth_year, height_cm, weight_kg, goal, experience, updated_at)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      name ?? null,
+      sex ?? null,
+      birthYear ?? null,
+      heightCm ?? null,
+      weightKg ?? null,
+      goal ?? null,
+      experience ?? null,
+      new Date().toISOString(),
+    ]
+  );
 }
 
 // Returns every logged exercise, unfiltered — used by the export feature to
