@@ -253,13 +253,18 @@ const TABS = [
     iconOff: require('../../assets/icons/chart_off.png'),
   },
   {
+    label: 'Macros',
+    iconOn: require('../../assets/icons/macros_on.png'),
+    iconOff: require('../../assets/icons/macros_off.png'),
+  },
+  {
     label: 'Profile',
     iconOn: require('../../assets/icons/profile_on.png'),
     iconOff: require('../../assets/icons/profile_off.png'),
   },
 ];
 
-// TEMPORARY PLACEHOLDER — Workouts/Progress screens don't exist yet.
+// TEMPORARY PLACEHOLDER — Workouts/Progress/Macros screens don't exist yet.
 function PlaceholderScreen({ label }) {
   return (
     <View style={styles.card}>
@@ -480,7 +485,7 @@ export default function HomeScreen() {
           </>
         )}
         {activeTab === 'Profile' && <ProfileScreen />}
-        {(activeTab === 'Workouts' || activeTab === 'Progress') && (
+        {(activeTab === 'Workouts' || activeTab === 'Progress' || activeTab === 'Macros') && (
           <PlaceholderScreen label={activeTab} />
         )}
       </ScrollView>
