@@ -257,11 +257,6 @@ const TABS = [
     iconOn: require('../../assets/icons/macros_on.png'),
     iconOff: require('../../assets/icons/macros_off.png'),
   },
-  {
-    label: 'Profile',
-    iconOn: require('../../assets/icons/profile_on.png'),
-    iconOff: require('../../assets/icons/profile_off.png'),
-  },
 ];
 
 // TEMPORARY PLACEHOLDER — Workouts/Progress/Macros screens don't exist yet.
@@ -475,6 +470,26 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.logoBar} />
         <Text style={styles.logoText}>PUMPIFY</Text>
+        {/* Profile lives up here instead of in the bottom nav; while it's
+            open, no bottom tab is highlighted. */}
+        <AnimatedIconButton
+          accessibilityLabel="Profile"
+          accessibilityRole="button"
+          accessibilityState={{ selected: activeTab === 'Profile' }}
+          hitSlop={10}
+          onPress={() => setActiveTab('Profile')}
+          style={[styles.headerProfileButton, activeTab === 'Profile' && styles.headerProfileButtonActive]}
+        >
+          <Image
+            fadeDuration={0}
+            source={
+              activeTab === 'Profile'
+                ? require('../../assets/icons/profile_on.png')
+                : require('../../assets/icons/profile_off.png')
+            }
+            style={styles.headerProfileIcon}
+          />
+        </AnimatedIconButton>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -527,10 +542,33 @@ const styles = StyleSheet.create({
   },
 
   logoText: {
+    flex: 1,
     fontSize: 18,
     fontWeight: '800',
     letterSpacing: 0.5,
     color: '#F5F5F5',
+  },
+
+  headerProfileButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#161616',
+    borderWidth: 1,
+    borderColor: '#242424',
+  },
+
+  headerProfileButtonActive: {
+    backgroundColor: '#2A331A',
+    borderColor: '#CFFF3D',
+  },
+
+  headerProfileIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
   },
 
   scrollContent: {
