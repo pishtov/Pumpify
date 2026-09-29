@@ -3,6 +3,7 @@ import time
 import shutil
 import sys
 import os
+import urllib.request
 
 # ============================================================
 # PUMPIFY DEVELOPMENT LAUNCHER
@@ -281,12 +282,19 @@ def start_expo():
     # Do NOT use CREATE_NO_WINDOW here.
     # Expo will use this same CMD window so you can
     # see Metro logs and use Expo keyboard commands.
+    #
+    # --android makes Expo open the app itself once Metro is ready, the same
+    # way `npx expo run:android` does: it sets up `adb reverse` and opens the
+    # dev client with a deep link pointing at THIS server. Launching the app
+    # any other way lets it reconnect to a stale/dead server URL, which is
+    # what broke Fast Refresh and made reloads crash.
     expo_process = subprocess.Popen(
         [
             npx_path,
             "expo",
             "start",
-            "--dev-client"
+            "--dev-client",
+            "--android"
         ],
         cwd=PROJECT,
         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
@@ -306,43 +314,67 @@ def stop_expo(expo_process):
 
 
 # ============================================================
-# LAUNCH PUMPIFY
+# CLOSE STALE APP
 # ============================================================
 
-def launch_app():
+def stop_app():
+    """Force-stop Pumpify before Metro starts.
+
+    The emulator's Quick Boot snapshot restores the app exactly as it was
+    last session — still attached to the old, now-dead Metro server. If
+    that process survives, Expo's launch only brings it to the front
+    instead of starting fresh, so Fast Refresh never connects.
+    """
+    run_adb(
+        "shell",
+        "am",
+        "force-stop",
+        PACKAGE_NAME
+    )
+
+
+# ============================================================
+# WAIT FOR METRO
+# ============================================================
+
+def wait_for_metro(timeout=120):
+    """Block until Metro answers on /status, or give up after `timeout`s.
+
+    Expo opens the app on its own (--android) as soon as Metro is up; this
+    just lets the launcher report honestly instead of guessing with a sleep.
+    """
 
     print_status(
-        "[4/4] Launching Pumpify...",
+        "[4/4] Waiting for Metro to open Pumpify...",
         CYAN
     )
 
-    # Give Expo a moment to initialize Metro.
-    time.sleep(4)
+    deadline = time.time() + timeout
 
-    result = run_adb(
-        "shell",
-        "monkey",
-        "-p",
-        PACKAGE_NAME,
-        "1"
+    while time.time() < deadline:
+
+        try:
+
+            with urllib.request.urlopen("http://127.0.0.1:8081/status", timeout=2) as response:
+
+                if b"packager-status:running" in response.read():
+
+                    print_status(
+                        "      Metro is ready — Expo is opening Pumpify.",
+                        GREEN
+                    )
+                    return True
+
+        except OSError:
+            pass
+
+        time.sleep(1)
+
+    print_status(
+        "      Metro did not respond in time. Check the Expo logs above.",
+        RED
     )
-
-    if result.returncode == 0:
-
-        print_status(
-            "      Pumpify launched!",
-            GREEN
-        )
-
-    else:
-
-        print_status(
-            "      Could not launch Pumpify.",
-            RED
-        )
-
-        if result.stderr:
-            print(result.stderr)
+    return False
 
 
 # ============================================================
@@ -400,8 +432,10 @@ def main():
     print()
 
     # --------------------------------------------------------
-    # Start Expo
+    # Start Expo (it opens the app itself once Metro is up)
     # --------------------------------------------------------
+
+    stop_app()
 
     expo_process = start_expo()
 
@@ -410,11 +444,7 @@ def main():
         input("Press Enter to exit...")
         return
 
-    # --------------------------------------------------------
-    # Launch installed development build
-    # --------------------------------------------------------
-
-    launch_app()
+    metro_ready = wait_for_metro()
 
     print()
     print("=" * 64)
@@ -423,8 +453,8 @@ def main():
     print()
     print(" VS Code      : OPEN")
     print(" Android      : READY")
-    print(" Expo/Metro   : RUNNING")
-    print(" Pumpify      : LAUNCHED")
+    print(" Expo/Metro   : " + ("RUNNING" if metro_ready else "NOT RESPONDING"))
+    print(" Pumpify      : " + ("OPENED BY EXPO" if metro_ready else "NOT OPENED"))
     print()
     print("=" * 64)
     print()
