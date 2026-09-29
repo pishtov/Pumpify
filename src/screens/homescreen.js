@@ -7,10 +7,9 @@ import Reanimated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
-  withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { scheduleOnUI } from 'react-native-worklets';
 import {
   getAllSessionExercises,
   getProfile,
@@ -179,20 +178,139 @@ function BodyPartLegend() {
   );
 }
 
-function NavTabButton({ tab, isActive, onPress }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const bgOpacity = useRef(new Animated.Value(isActive ? 1 : 0)).current;
-  const liftY = useRef(new Animated.Value(isActive ? -4 : 0)).current;
+// How far the active tab (and the indicator behind it) floats up.
+const NAV_LIFT = 4;
+
+// The indicator travels between tabs over one 0 → 1 progress value. Position
+// and width follow the eased progress, and the squeeze follows sin(π·progress):
+// zero at takeoff, strongest mid-flight, exactly zero on arrival — so it only
+// squishes while moving and lands with no bounce.
+const INDICATOR_TRAVEL = { duration: 380, easing: Easing.inOut(Easing.cubic) };
+const SQUEEZE_Y = 0.4; // squashes to 60% height at the peak
+const SQUEEZE_X = 0.18; // and stretches 18% wider, so it reads as squished, not shrunk
+
+// One shared glowing pill behind the tabs, instead of a background per tab —
+// so switching tabs moves the same box rather than fading one out and
+// another in. tabLayouts are each tab's frame within the nav bar.
+function NavIndicator({ activeTab, tabLayouts }) {
+  const fromX = useSharedValue(0);
+  const toX = useSharedValue(0);
+  const fromWidth = useSharedValue(0);
+  const toWidth = useSharedValue(0);
+  const progress = useSharedValue(1);
+  const y = useSharedValue(0);
+  const height = useSharedValue(0);
+  const placedTabRef = useRef(null);
 
   useEffect(() => {
-    Animated.timing(bgOpacity, {
-      toValue: isActive ? 1 : 0,
-      duration: 160,
-      useNativeDriver: true,
-    }).start();
+    const layout = tabLayouts[activeTab];
 
+    // No bottom tab is active (e.g. Profile is open from the header) — stay
+    // put on the last tab; it flies from there when a tab is picked again.
+    if (!layout) return;
+
+    y.value = layout.y;
+    height.value = layout.height;
+
+    // First placement: snap into place, nothing to fly from.
+    if (placedTabRef.current == null) {
+      placedTabRef.current = activeTab;
+      progress.value = 1;
+      fromX.value = layout.x;
+      toX.value = layout.x;
+      fromWidth.value = layout.width;
+      toWidth.value = layout.width;
+      return;
+    }
+
+    // Same tab re-measured — this happens right after every switch, because
+    // the active label turns bold and the tab gets wider. Only nudge the
+    // destination; snapping here would cut the flight short on its first frame.
+    if (placedTabRef.current === activeTab) {
+      toX.value = layout.x;
+      toWidth.value = layout.width;
+      return;
+    }
+
+    placedTabRef.current = activeTab;
+    // Runs on the UI thread so it can read exactly where the box is right now
+    // — if a previous flight is interrupted, the new one starts from there.
+    scheduleOnUI(
+      (targetX, targetWidth) => {
+        'worklet';
+        const t = progress.value;
+        fromX.value = fromX.value + (toX.value - fromX.value) * t;
+        fromWidth.value = fromWidth.value + (toWidth.value - fromWidth.value) * t;
+        toX.value = targetX;
+        toWidth.value = targetWidth;
+        progress.value = 0;
+        progress.value = withTiming(1, INDICATOR_TRAVEL);
+      },
+      layout.x,
+      layout.width
+    );
+  }, [activeTab, tabLayouts]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const t = progress.value;
+    const squeeze = Math.sin(Math.PI * t);
+    return {
+      width: fromWidth.value + (toWidth.value - fromWidth.value) * t,
+      height: height.value,
+      transform: [
+        { translateX: fromX.value + (toX.value - fromX.value) * t },
+        { translateY: y.value - NAV_LIFT },
+        { scaleX: 1 + SQUEEZE_X * squeeze },
+        { scaleY: 1 - SQUEEZE_Y * squeeze },
+      ],
+    };
+  });
+
+  return <Reanimated.View pointerEvents="none" style={[styles.navIndicator, animatedStyle]} />;
+}
+
+function BottomNav({ activeTab, onSelect }) {
+  const [tabLayouts, setTabLayouts] = useState({});
+
+  const handleTabLayout = useCallback((label, layout) => {
+    setTabLayouts((prev) => {
+      const existing = prev[label];
+      if (
+        existing &&
+        existing.x === layout.x &&
+        existing.y === layout.y &&
+        existing.width === layout.width &&
+        existing.height === layout.height
+      ) {
+        return prev;
+      }
+      return { ...prev, [label]: layout };
+    });
+  }, []);
+
+  return (
+    <View style={styles.bottomNav}>
+      <NavIndicator activeTab={activeTab} tabLayouts={tabLayouts} />
+      {TABS.map((tab) => (
+        <NavTabButton
+          isActive={activeTab === tab.label}
+          key={tab.label}
+          onLayout={handleTabLayout}
+          onPress={() => onSelect(tab.label)}
+          tab={tab}
+        />
+      ))}
+    </View>
+  );
+}
+
+function NavTabButton({ tab, isActive, onLayout, onPress }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const liftY = useRef(new Animated.Value(isActive ? -NAV_LIFT : 0)).current;
+
+  useEffect(() => {
     Animated.spring(liftY, {
-      toValue: isActive ? -4 : 0,
+      toValue: isActive ? -NAV_LIFT : 0,
       friction: 7,
       tension: 120,
       useNativeDriver: true,
@@ -222,6 +340,7 @@ function NavTabButton({ tab, isActive, onPress }) {
       accessibilityRole="tab"
       accessibilityState={{ selected: isActive }}
       hitSlop={6}
+      onLayout={(event) => onLayout(tab.label, event.nativeEvent.layout)}
       onPress={handlePress}
     >
       <Animated.View
@@ -230,7 +349,6 @@ function NavTabButton({ tab, isActive, onPress }) {
           { transform: [{ scale }, { translateY: liftY }] },
         ]}
       >
-        <Animated.View style={[styles.navItemBackground, { opacity: bgOpacity }]} />
         <Image
           fadeDuration={0}
           source={isActive ? tab.iconOn : tab.iconOff}
@@ -513,16 +631,7 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      <View style={styles.bottomNav}>
-        {TABS.map((tab) => (
-          <NavTabButton
-            isActive={activeTab === tab.label}
-            key={tab.label}
-            onPress={() => setActiveTab(tab.label)}
-            tab={tab}
-          />
-        ))}
-      </View>
+      <BottomNav activeTab={activeTab} onSelect={setActiveTab} />
     </View>
   );
 }
@@ -872,12 +981,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
 
-  navItemBackground: {
+  navIndicator: {
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
     borderRadius: 14,
     backgroundColor: '#d0ff0060',
   },
