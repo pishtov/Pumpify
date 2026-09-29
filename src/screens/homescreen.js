@@ -185,7 +185,7 @@ const NAV_LIFT = 4;
 // and width follow the eased progress, and the squeeze follows sin(π·progress):
 // zero at takeoff, strongest mid-flight, exactly zero on arrival — so it only
 // squishes while moving and lands with no bounce.
-const INDICATOR_TRAVEL = { duration: 380, easing: Easing.inOut(Easing.cubic) };
+const INDICATOR_TRAVEL = { duration: 180, easing: Easing.inOut(Easing.cubic) };
 const SQUEEZE_Y = 0.4; // squashes to 60% height at the peak
 const SQUEEZE_X = 0.18; // and stretches 18% wider, so it reads as squished, not shrunk
 
