@@ -3,6 +3,14 @@ import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View }
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import Reanimated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import {
   getAllSessionExercises,
   getProfile,
@@ -543,7 +551,7 @@ const styles = StyleSheet.create({
 
   logoText: {
     flex: 1,
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '800',
     letterSpacing: 0.5,
     color: '#F5F5F5',
